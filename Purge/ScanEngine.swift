@@ -92,7 +92,10 @@ final class ScanEngine {
                 .filter { !$0.photos.isEmpty }
 
             dayGroups = validGroups
-            if !dayGroups.isEmpty { phase = .complete }
+            if !dayGroups.isEmpty {
+                phase = .complete
+                NotificationService.checkAndScheduleNotifications(for: dayGroups)
+            }
         } catch {
             // Entity not found or schema mismatch — clear stale data and let the next scan rebuild cleanly.
             try? context.delete(model: ClusterRecord.self)
@@ -267,7 +270,10 @@ final class ScanEngine {
             context: context
         )
 
-        await MainActor.run { phase = .complete }
+        await MainActor.run {
+            phase = .complete
+            NotificationService.checkAndScheduleNotifications(for: dayGroups)
+        }
 
         // ── 8. Background geocoding ────────────────────────────────────────
         Task { await geocodeDayGroups() }

@@ -30,8 +30,8 @@ struct NotificationService {
         content.sound = .default
         
         var dateComponents = DateComponents()
-        dateComponents.hour = 1
-        dateComponents.minute = 15
+        dateComponents.hour = 10
+        dateComponents.minute = 35
         let trigger = UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: true)
         
         let request = UNNotificationRequest(identifier: "onThisDay", content: content, trigger: trigger)

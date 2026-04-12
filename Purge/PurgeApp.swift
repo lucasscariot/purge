@@ -7,15 +7,17 @@ struct PurgeApp: App {
     @State private var scanEngine = ScanEngine()
     
     init() {
+        UNUserNotificationCenter.current().delegate = NotificationManager.shared
+        
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
             if granted {
                 let content = UNMutableNotificationContent()
-                content.title = "Purge Test"
-                content.body = "If you see this, notifications are working!"
+                content.title = "Thanks for using Purge"
+                content.body = "We'll notify you when it's time to manage your photos."
                 content.sound = .default
                 
-                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
-                let request = UNNotificationRequest(identifier: "testNotification", content: content, trigger: trigger)
+                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+                let request = UNNotificationRequest(identifier: "thankYouNotification", content: content, trigger: trigger)
                 
                 UNUserNotificationCenter.current().add(request)
             }
