@@ -1,18 +1,3 @@
-//
-//  Item.swift
-//  Purge
-//
-//  Created by Lucas Scariot on 12/04/2026.
-//
-
+// Item.swift — original SwiftData template; superseded by Models.swift
+// Kept as placeholder; safe to delete.
 import Foundation
-import SwiftData
-
-@Model
-final class Item {
-    var timestamp: Date
-    
-    init(timestamp: Date) {
-        self.timestamp = timestamp
-    }
-}
