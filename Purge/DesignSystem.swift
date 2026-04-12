@@ -111,7 +111,7 @@ struct FlowLayout: Layout {
     var spacing: CGFloat = 16
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let width = proposal.width ?? UIScreen.main.bounds.width
+        let width = proposal.width ?? 375
         let result = FlowResult(in: width, subviews: subviews, spacing: spacing)
         return result.size
     }

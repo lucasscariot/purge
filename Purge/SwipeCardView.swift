@@ -207,7 +207,6 @@ struct SwipeCardView: View {
     }
 
     private func flyOff(to destination: CGSize, decision: UserDecision) {
-        UIImpactFeedbackGenerator(style: hapticStyle(for: decision)).impactOccurred()
         withAnimation(.easeIn(duration: 0.28)) { offset = destination }
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(320))

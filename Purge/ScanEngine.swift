@@ -34,7 +34,7 @@ final class ScanEngine {
 
     // ── DEBUG FLAGS ──────────────────────────────────────────────────────────
     // Set to a non-nil value to cap the number of photos processed.
-    private let DEBUG_PHOTO_CAP: Int? = 5000
+    private let DEBUG_PHOTO_CAP: Int? = nil
 
     // MARK: - PHCachingImageManager (pre-warm iCloud photos before Vision analysis)
 
@@ -297,7 +297,7 @@ final class ScanEngine {
         }
 
         // Pre-resolve ALL PHAssets for all batches upfront — PHAsset.fetchAssets is O(1) in-memory.
-        var batchPHAssets: [[PHAsset]] = await Task.detached(priority: .utility) {
+        let batchPHAssets: [[PHAsset]] = await Task.detached(priority: .utility) {
             batches.map { batch in
                 let ids = batch.map(\.localIdentifier)
                 let r = PHAsset.fetchAssets(withLocalIdentifiers: ids, options: nil)
@@ -306,6 +306,7 @@ final class ScanEngine {
                 return assets
             }
         }.value
+
 
         var previousPrefetchAssets: [PHAsset] = []
 
@@ -554,7 +555,7 @@ final class ScanEngine {
         private var _value: Bool
         private let lock = NSLock()
         
-        init(_ value: Bool) { self._value = value }
+        nonisolated init(_ value: Bool) { self._value = value }
         
         func tryConsume() -> Bool {
             lock.lock()

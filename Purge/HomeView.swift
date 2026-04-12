@@ -25,18 +25,25 @@ struct HomeView: View {
                         }
                         .padding(.top, -32)
                         
-                        retrospectiveSection
-                            .padding(.top, -16)
-                        
                         heroSection
+                            .padding(.top, 16)
+                        
+                        onThisDaySection
+                            .padding(.top, -16)
                         
                         if scanProgress != nil {
                             scanningState
                         } else if dayGroups.isEmpty {
                             emptyState
                         } else {
-                            StaggeredGrid(dayGroups, columns: 2, spacing: 24) { day in
-                                DaySection(day: day, selectedDay: $selectedDay)
+                            let columns = [
+                                GridItem(.flexible(), spacing: 24),
+                                GridItem(.flexible(), spacing: 24)
+                            ]
+                            LazyVGrid(columns: columns, spacing: 24) {
+                                ForEach(dayGroups.sorted(by: { $0.date > $1.date })) { day in
+                                    DaySection(day: day, selectedDay: $selectedDay)
+                                }
                             }
                             .padding(.horizontal, 24)
                         }
@@ -101,38 +108,52 @@ struct HomeView: View {
         return windowScene?.windows.first?.safeAreaInsets.top ?? 44
     }
     
-    // MARK: - Retrospective
+    // MARK: - On This Day
     
     @ViewBuilder
-    private var retrospectiveSection: some View {
+    private var onThisDaySection: some View {
+        let currentMonth = Calendar.current.component(.month, from: Date())
+        let currentDay = Calendar.current.component(.day, from: Date())
         let currentYear = Calendar.current.component(.year, from: Date())
-        let years = Set(dayGroups.map { Calendar.current.component(.year, from: $0.date) })
-        let retroYears = years.filter { $0 < currentYear }.sorted(by: >)
         
-        if !retroYears.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
-                    ForEach(retroYears, id: \.self) { year in
-                        let diff = currentYear - year
-                        let text = diff == 1 ? "1 YEAR AGO" : "\(diff) YEARS AGO"
-                        let colors = [PurgeColor.mustard, PurgeColor.rose, PurgeColor.sage, PurgeColor.lavender, PurgeColor.peach]
-                        let color = colors[year % colors.count]
-                        
-                        Text(text)
-                            .font(PurgeFont.mono(14, weight: .bold))
-                            .foregroundStyle(PurgeColor.text)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(
-                                ScrapbookNoteShape()
-                                    .fill(color)
-                                    .stickerShadow()
-                            )
-                            .rotationEffect(.degrees(Double((year * 7) % 11) - 5.0))
+        let pastDays = dayGroups.filter { group in
+            let month = Calendar.current.component(.month, from: group.date)
+            let day = Calendar.current.component(.day, from: group.date)
+            let year = Calendar.current.component(.year, from: group.date)
+            return month == currentMonth && day == currentDay && year < currentYear
+        }
+        
+        if !pastDays.isEmpty {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("On This Day")
+                    .font(PurgeFont.display(24, weight: .bold))
+                    .foregroundStyle(PurgeColor.text)
+                    .padding(.horizontal, 24)
+                
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 24) {
+                        ForEach(pastDays.sorted(by: { Calendar.current.component(.year, from: $0.date) > Calendar.current.component(.year, from: $1.date) }), id: \.id) { group in
+                            let year = Calendar.current.component(.year, from: group.date)
+                            
+                            Button(action: {
+                                selectedDay = group
+                            }) {
+                                VStack(alignment: .center, spacing: 12) {
+                                    PhotoPileView(photos: group.photos, seed: group.id.hashValue)
+                                        .stickerShadow()
+                                        .rotationEffect(.degrees(Double((year * 7) % 11) - 5.0))
+                                    
+                                    Text(String(year))
+                                        .font(PurgeFont.mono(14, weight: .bold))
+                                        .foregroundStyle(PurgeColor.text)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 8)
                 }
-                .padding(.horizontal, 24)
-                .padding(.vertical, 16)
             }
         }
     }
@@ -249,11 +270,6 @@ struct DaySection: View {
             .padding(.horizontal, 4)
         }
         .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, perform: {}, onPressingChanged: { pressing in
-            if pressing {
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            } else {
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            }
             withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                 isPressed = pressing
             }
@@ -310,6 +326,7 @@ struct PhotoPileView: View {
 struct PilePhotoView: View {
     let photo: DummyPhoto
     @State private var loadedImage: UIImage?
+    @State private var asset: PHAsset?
     
     var body: some View {
         ZStack {
@@ -330,39 +347,19 @@ struct PilePhotoView: View {
         )
         .shadow(color: PurgeColor.text.opacity(0.1), radius: 2, x: 0, y: 1)
         .task(id: photo.localIdentifier) {
-            await loadImage()
-        }
-    }
-    
-    private func loadImage() async {
-        guard let localId = photo.localIdentifier else { return }
-        
-        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [localId], options: nil)
-        guard let asset = fetchResult.firstObject else { return }
-        
-        let options = PHImageRequestOptions()
-        options.isNetworkAccessAllowed = true
-        options.deliveryMode = .opportunistic
-        options.isSynchronous = false
-        
-        let targetSize = CGSize(width: 256, height: 256)
-        
-        let image: UIImage? = await withCheckedContinuation { continuation in
-            let flag = SendableBox(false)
-            PHImageManager.default().requestImage(
-                for: asset,
-                targetSize: targetSize,
-                contentMode: .aspectFill,
-                options: options
-            ) { img, _ in
-                if flag.tryConsume() {
-                    continuation.resume(returning: img)
+            guard let localId = photo.localIdentifier else { return }
+            let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [localId], options: nil)
+            self.asset = fetchResult.firstObject
+            if let asset = self.asset {
+                ImageCache.shared.requestImage(for: asset, targetSize: CGSize(width: 256, height: 256)) { image in
+                    self.loadedImage = image
                 }
             }
         }
-        
-        if let image = image {
-            self.loadedImage = image
+        .onDisappear {
+            if let asset = asset {
+                ImageCache.shared.cancelRequest(for: asset)
+            }
         }
     }
 }

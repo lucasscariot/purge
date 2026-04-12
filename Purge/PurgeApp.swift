@@ -1,11 +1,29 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 @main
 struct PurgeApp: App {
     @State private var scanEngine = ScanEngine()
+    
+    init() {
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+            if granted {
+                let content = UNMutableNotificationContent()
+                content.title = "Purge Test"
+                content.body = "If you see this, notifications are working!"
+                content.sound = .default
+                
+                let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 5, repeats: false)
+                let request = UNNotificationRequest(identifier: "testNotification", content: content, trigger: trigger)
+                
+                UNUserNotificationCenter.current().add(request)
+            }
+        }
+    }
 
     var body: some Scene {
+
         WindowGroup {
             ContentRootView()
                 .environment(scanEngine)

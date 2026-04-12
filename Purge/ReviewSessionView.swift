@@ -1,9 +1,9 @@
 import SwiftUI
 import Photos
+import UIKit
 
-// MARK: - Network-aware photo loader
+struct NetworkPhotoImage: View {
 
-private struct NetworkPhotoImage: View {
     let localIdentifier: String
     let placeholder: Color
 
@@ -248,7 +248,6 @@ struct ReviewSessionView: View {
                     markedForDeletion.insert(id)
                 }
             }
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
         }
     }
 
@@ -307,8 +306,4 @@ struct ReviewSessionView: View {
             ? String(format: "%.1fGB", Double(selectedMB) / 1000)
             : "\(selectedMB)MB"
     }
-}
-
-#Preview {
-    ReviewSessionView(cluster: PhotoCluster.sampleClusters[0])
 }

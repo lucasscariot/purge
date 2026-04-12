@@ -427,7 +427,6 @@ struct DayDetailView: View {
             if selectedIDs.contains(id) { selectedIDs.remove(id) }
             else                         { selectedIDs.insert(id) }
         }
-        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     // MARK: - Footer
@@ -469,10 +468,11 @@ struct DayDetailView: View {
                     .foregroundStyle(PurgeColor.textMuted)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
-                    .background(PurgeColor.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-                    .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Color.white, lineWidth: 3))
-                    .stickerShadow()
+                    .background(
+                        ScrapbookNoteShape()
+                            .fill(PurgeColor.surface)
+                            .stickerShadow()
+                    )
                     .rotationEffect(.degrees(-1))
                 }
                 .buttonStyle(ScrapbookButtonStyle())
@@ -495,10 +495,11 @@ struct DayDetailView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
-                    .background(PurgeColor.primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-                    .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Color.white, lineWidth: 3))
-                    .stickerShadow()
+                    .background(
+                        ScrapbookNoteShape()
+                            .fill(PurgeColor.primary)
+                            .stickerShadow()
+                    )
                     .rotationEffect(.degrees(1))
                 }
                 .buttonStyle(ScrapbookButtonStyle())
@@ -509,7 +510,6 @@ struct DayDetailView: View {
     }
 
     private func confirmDeletion() {
-        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
         let idsToDelete = Array(selectedIDs)
         PHPhotoLibrary.shared().performChanges {
             let assets = PHAsset.fetchAssets(withLocalIdentifiers: idsToDelete, options: nil)
