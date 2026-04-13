@@ -1,8 +1,10 @@
 // PURGE — Tactile Scrapbook Design System
-// Fonts: AntonSC-Regular (wordmark only), IBMPlexMono (code/mono labels)
+// Fonts: AntonSC-Regular (wordmark only), IBPMono (code/mono labels)
 // Display: System Serif (New York), UI: System Rounded (SF Pro Rounded)
 
 import SwiftUI
+import Photos
+import UIKit
 
 // MARK: - Color Palette
 
@@ -172,5 +174,85 @@ struct StatusDot: View {
     var size: CGFloat = 7
     var body: some View {
         Circle().fill(color).frame(width: size, height: size)
+    }
+}
+
+// MARK: - Spacing Constants
+
+enum PurgeSpacing {
+    /// Extra small spacing — tight element grouping
+    static let xs: CGFloat = 4
+    /// Small spacing — icon-to-text, compact lists
+    static let small: CGFloat = 8
+    /// Default spacing — between related elements
+    static let medium: CGFloat = 16
+    /// Large spacing — section separation
+    static let large: CGFloat = 24
+    /// Extra large spacing — major section breaks
+    static let xl: CGFloat = 32
+    /// Hero spacing — screen padding, full-width sections
+    static let hero: CGFloat = 48
+}
+
+// MARK: - Animation Durations
+
+enum PurgeAnimation {
+    /// Quick feedback — button press, toggle
+    static let quick: Double = 0.2
+    /// Default — standard transitions
+    static let standard: Double = 0.35
+    /// Slow — large view transitions
+    static let slow: Double = 0.5
+    /// Gesture-driven — spring with medium damping
+    static let gesture: Double = 0.4
+    /// Spring press — button interactions
+    static let springPress: Double = 0.3
+}
+
+// MARK: - Async Photo Image (shared component)
+
+/// Unified async photo loader using ImageCache for memory management and concurrency control
+struct AsyncPhotoImage: View {
+    let localIdentifier: String
+    let placeholder: Color
+    var targetSize: CGSize = CGSize(width: 800, height: 800)
+    var contentMode: ContentMode = .fill
+
+    @State private var image: UIImage?
+    @State private var isLoading = false
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: contentMode)
+            } else {
+                Rectangle().fill(placeholder)
+            }
+        }
+        .clipped()
+        .task(id: localIdentifier) {
+            await loadImage()
+        }
+    }
+
+    private func loadImage() async {
+        guard !localIdentifier.isEmpty else { return }
+
+        guard let asset = PHAsset
+            .fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
+            .firstObject
+        else { return }
+
+        let finalImage: UIImage? = await withCheckedContinuation { continuation in
+            ImageCache.shared.requestImage(for: asset, targetSize: targetSize, ignoreDegraded: true) { image in
+                continuation.resume(returning: image)
+            }
+        }
+        
+        if let finalImage = finalImage {
+            self.image = finalImage
+        }
     }
 }

@@ -159,9 +159,15 @@ final class PhotoStackOverlayView: UIView {
     // MARK: Progress (called on every gesture .changed)
 
     func updateProgress(_ t: CGFloat) {
+        updateProgressWithRotation(t, rotation: 0)
+    }
+
+    func updateProgressWithRotation(_ t: CGFloat, rotation: CGFloat) {
         for (i, card) in cardViews.enumerated() {
             card.center    = lerp(stackCenters[i],    spreadCenters[i],    t)
-            card.transform = lerpAffine(stackTransforms[i], spreadTransforms[i], t)
+            let baseTransform = lerpAffine(stackTransforms[i], spreadTransforms[i], t)
+            let rotationTransform = CGAffineTransform(rotationAngle: rotation)
+            card.transform = rotationTransform.concatenating(baseTransform)
             card.alpha     = stackAlphas[i] + (1 - stackAlphas[i]) * t
         }
         dimView.alpha = t * 0.45
@@ -169,7 +175,7 @@ final class PhotoStackOverlayView: UIView {
 
     // MARK: Spring back and remove
 
-    func springClose(releaseVelocity: CGFloat = 0) {
+    func springClose(releaseVelocity: CGFloat = 0, finalRotation: CGFloat = 0) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
         // UIView.animate with .beginFromCurrentState reads the presentation layer for
@@ -184,7 +190,8 @@ final class PhotoStackOverlayView: UIView {
         ) {
             for (i, card) in self.cardViews.enumerated() {
                 card.center    = self.stackCenters[i]
-                card.transform = self.stackTransforms[i]
+                let rotationTransform = CGAffineTransform(rotationAngle: -finalRotation)
+                card.transform = rotationTransform.concatenating(self.stackTransforms[i])
                 card.alpha     = self.stackAlphas[i]
             }
             self.dimView.alpha = 0
@@ -226,6 +233,9 @@ final class PhotoStackView: UIView {
     private var seed:       Int = 0
     private var imageViews: [UIImageView] = []
     private weak var activeOverlay: PhotoStackOverlayView?
+    
+    // Track cumulative rotation across pinch + rotation gestures
+    private var currentRotation: CGFloat = 0
 
     // Patterns mirror PhotoPileView exactly
     private let patternOffsets: [[CGPoint]] = [
@@ -300,18 +310,43 @@ final class PhotoStackView: UIView {
 
     private func addGestures() {
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(handlePinch(_:)))
+        pinch.delegate = self
         addGestureRecognizer(pinch)
+        
+        let rotation = UIRotationGestureRecognizer(target: self, action: #selector(handleRotation(_:)))
+        rotation.delegate = self
+        addGestureRecognizer(rotation)
+        
         let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
         addGestureRecognizer(tap)
     }
 
     @objc private func handleTap() { onTap?() }
 
+    @objc private func handleRotation(_ g: UIRotationGestureRecognizer) {
+        switch g.state {
+        case .began:
+            currentRotation = 0
+        case .changed:
+            currentRotation += g.rotation
+            g.rotation = 0
+            activeOverlay?.updateProgressWithRotation(currentPinchProgress, rotation: currentRotation)
+        case .ended, .cancelled, .failed:
+            break
+        default:
+            break
+        }
+    }
+    
+    private var currentPinchProgress: CGFloat = 0
+
     @objc private func handlePinch(_ g: UIPinchGestureRecognizer) {
         switch g.state {
         case .began:
             guard activeOverlay == nil, let window else { return }
             let sourceFrame = convert(bounds, to: window)
+            currentRotation = 0
+            currentPinchProgress = 0
 
             // Hide grid cards — overlay will show identical cards on top
             imageViews.forEach { $0.alpha = 0 }
@@ -335,14 +370,24 @@ final class PhotoStackView: UIView {
 
         case .changed:
             let progress = max(0, min(1, (g.scale - 1.0) / 1.2))
-            activeOverlay?.updateProgress(progress)
+            currentPinchProgress = progress
+            activeOverlay?.updateProgressWithRotation(progress, rotation: currentRotation)
 
         case .ended, .cancelled, .failed:
-            activeOverlay?.springClose(releaseVelocity: g.velocity)
+            activeOverlay?.springClose(releaseVelocity: g.velocity, finalRotation: currentRotation)
 
         default:
             break
         }
+    }
+}
+
+// MARK: - UIGestureRecognizerDelegate
+
+extension PhotoStackView: UIGestureRecognizerDelegate {
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                         shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        return true
     }
 }
 

@@ -2,60 +2,6 @@ import SwiftUI
 import UIKit
 import Photos
 
-// MARK: - Async Photo Image
-
-private struct AsyncPhotoImage: View {
-    let localIdentifier: String
-    let placeholder: Color
-    var targetSize: CGSize = CGSize(width: 800, height: 800)
-
-    @State private var image: UIImage?
-
-    var body: some View {
-        Group {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                placeholder
-            }
-        }
-        .clipped()
-        .task(id: localIdentifier) { await loadImage() }
-    }
-
-    private func loadImage() async {
-        guard let asset = PHAsset
-            .fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
-            .firstObject
-        else { return }
-
-        let options = PHImageRequestOptions()
-        options.isNetworkAccessAllowed = true
-        options.deliveryMode = .opportunistic
-        
-        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            var delivered = false
-            PHImageManager.default().requestImage(
-                for: asset,
-                targetSize: targetSize,
-                contentMode: .aspectFill,
-                options: options
-            ) { img, info in
-                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) == true
-                if let img, !delivered {
-                    Task { @MainActor in self.image = img }
-                }
-                if !isDegraded && !delivered {
-                    delivered = true
-                    continuation.resume()
-                }
-            }
-        }
-    }
-}
-
 // MARK: - Natural Pinchable Tile
 
 private struct NaturalPinchableTile: View {

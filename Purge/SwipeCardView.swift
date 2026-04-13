@@ -1,63 +1,6 @@
 import SwiftUI
 import Photos
 
-// MARK: - Async real-photo loader
-
-private struct PhotoAssetImage: View {
-    let localIdentifier: String
-    let placeholder: Color
-
-    @State private var image: UIImage?
-
-    var body: some View {
-        Group {
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Rectangle().fill(placeholder)
-            }
-        }
-        .task(id: localIdentifier) {
-            guard let asset = PHAsset
-                .fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
-                .firstObject
-            else { return }
-
-            let options = PHImageRequestOptions()
-            options.isNetworkAccessAllowed = true
-            options.deliveryMode = .opportunistic
-            options.isSynchronous = false
-
-            let size = CGSize(width: 600, height: 600)
-
-            let stream = AsyncStream<UIImage> { cont in
-                // nonisolated(unsafe): written once before the stream is consumed,
-                // read only in onTermination — safe to cross isolation boundary.
-                nonisolated(unsafe) var requestID: PHImageRequestID = PHInvalidImageRequestID
-                requestID = PHImageManager.default().requestImage(
-                    for: asset, targetSize: size,
-                    contentMode: .aspectFill, options: options
-                ) { img, info in
-                    if let img { cont.yield(img) }
-                    let isDone = (info?[PHImageResultIsDegradedKey] as? Bool) == false
-                    if isDone { cont.finish() }
-                }
-                cont.onTermination = { _ in
-                    if requestID != PHInvalidImageRequestID {
-                        PHImageManager.default().cancelImageRequest(requestID)
-                    }
-                }
-            }
-
-            for await img in stream {
-                image = img
-            }
-        }
-    }
-}
-
 // MARK: -
 
 struct SwipeCardView: View {
@@ -109,7 +52,7 @@ struct SwipeCardView: View {
         ZStack {
             // Photo content
             if let id = photo.localIdentifier {
-                PhotoAssetImage(localIdentifier: id, placeholder: photo.color)
+                AsyncPhotoImage(localIdentifier: id, placeholder: photo.color)
             } else {
                 Rectangle().fill(photo.color)
             }
