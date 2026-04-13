@@ -103,11 +103,12 @@ final class ScanEngine {
 
         // Explicitly dispatch to a background queue to avoid blocking the main thread
         // and prevent potential deadlocks with the Photos library.
+        let assetIds = assets.map { $0.localIdentifier }
         let success = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 // Re-fetch assets inside the closure so they are captured as Sendable PHObject
                 // (PHAsset is Sendable when fetched fresh from the library).
-                let localIds = assets.map { $0.localIdentifier }
+                let localIds = assetIds
                 let fetchOptions = PHFetchOptions()
                 fetchOptions.predicate = NSPredicate(format: "localIdentifier IN %@", localIds)
                 let freshFetch = PHAsset.fetchAssets(with: fetchOptions)
