@@ -9,8 +9,12 @@ struct PurgeApp: App {
     init() {
         UNUserNotificationCenter.current().delegate = NotificationManager.shared
         
+        // Check if we already asked for permission before — only send "thank you" on first grant
+        let hasRequestedPermission = UserDefaults.standard.bool(forKey: "notificationPermissionRequested")
+        
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
-            if granted {
+            if granted && !hasRequestedPermission {
+                // Only show "thank you" if this is the first time permission was granted
                 let content = UNMutableNotificationContent()
                 content.title = "Thanks for using Purge"
                 content.body = "We'll notify you when it's time to manage your photos."
@@ -22,6 +26,8 @@ struct PurgeApp: App {
                 UNUserNotificationCenter.current().add(request)
             }
         }
+        
+        UserDefaults.standard.set(true, forKey: "notificationPermissionRequested")
     }
 
     var body: some Scene {
