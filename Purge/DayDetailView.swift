@@ -117,11 +117,22 @@ struct ScrapbookNoteShape: Shape {
 
 // MARK: - DayDetailView
 struct DayDetailView: View {
-    let day: DayGroup
+    let dayId: UUID
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss)   private var dismiss
+    @Environment(ScanEngine.self) private var scanEngine
+    @Environment(\.modelContext) private var modelContext
+
     @State private var selectedIDs: Set<String> = []
-    @State private var showComplete = false
+    // isDeleting is now derived from scanEngine.isDeleting, not a local state
+    // that needs manual resetting
+    private var isDeleting: Bool { scanEngine.isDeleting }
+    
+    // Look up the current day from scanEngine.dayGroups to get live updates
+    // when photos are deleted
+    private var day: DayGroup? {
+        scanEngine.dayGroups.first { $0.id == dayId }
+    }
 
     // Group colour palette — deterministic per index
     private static let groupColors: [Color] = [
@@ -133,6 +144,7 @@ struct DayDetailView: View {
     ]
 
     private var dupGroupMap: [String: (Int, Color)] {
+        guard let day else { return [:] }
         var map: [String: (Int, Color)] = [:]
         for (i, group) in day.nearDuplicateSets.enumerated() {
             let color = Self.groupColors[i % Self.groupColors.count]
@@ -142,17 +154,19 @@ struct DayDetailView: View {
     }
 
     private var selectedMB: Int {
-        day.photos
+        (day?.photos ?? [])
             .filter { selectedIDs.contains($0.localIdentifier ?? "") }
             .reduce(0) { $0 + $1.sizeMB }
     }
 
     private var dateLabel: String {
         let f = DateFormatter(); f.dateFormat = "EEE d MMM yyyy"
-        return f.string(from: day.date).uppercased()
+        guard let date = day?.date else { return "" }
+        return f.string(from: date).uppercased()
     }
 
     private var locationDisplayString: String? {
+        guard let day else { return nil }
         if !day.location.isEmpty {
             return day.location
         } else if let lat = day.representativeLat, let lng = day.representativeLng {
@@ -164,45 +178,49 @@ struct DayDetailView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
-            DotGridBackground()
+        if let day {
+            ZStack(alignment: .top) {
+                DotGridBackground()
 
-            ScrollView {
-                VStack(spacing: 32) {
-                    // Header and action card are now in the ScrollView
-                    customHeader
-                    
-                    if !day.nearDuplicateSets.isEmpty {
-                        quickActionBar
+                ScrollView {
+                    VStack(spacing: 32) {
+                        // Header and action card are now in the ScrollView
+                        customHeader
+                        
+                        if !day.nearDuplicateSets.isEmpty {
+                            quickActionBar
+                        }
+                        
+                        ForEach(Array(day.nearDuplicateSets.enumerated()), id: \.offset) { i, group in
+                            clusterSection(index: i, group: group)
+                        }
+                        
+                        let singles = day.photos.filter { photo in
+                            let id = photo.localIdentifier ?? ""
+                            return dupGroupMap[id] == nil
+                        }
+                        
+                        if !singles.isEmpty {
+                            singlesSection(singles: singles)
+                        }
+                        
+                        Color.clear.frame(height: 120) // clearance for footer
                     }
-                    
-                    ForEach(Array(day.nearDuplicateSets.enumerated()), id: \.offset) { i, group in
-                        clusterSection(index: i, group: group)
-                    }
-                    
-                    let singles = day.photos.filter { photo in
-                        let id = photo.localIdentifier ?? ""
-                        return dupGroupMap[id] == nil
-                    }
-                    
-                    if !singles.isEmpty {
-                        singlesSection(singles: singles)
-                    }
-                    
-                    Color.clear.frame(height: 120) // clearance for footer
+                }
+                .scrollIndicators(.hidden)
+                
+                // Footer floats over grid
+                VStack {
+                    Spacer()
+                    footer
                 }
             }
-            .scrollIndicators(.hidden)
-            
-            // Footer floats over grid
-            VStack {
-                Spacer()
-                footer
-            }
+            .toolbar(.visible, for: .navigationBar)
+            .navigationBarBackButtonHidden(false)
+        } else {
+            // Day not found — show empty state (may have been deleted)
+            ZStack { Color.black }
         }
-        .toolbar(.visible, for: .navigationBar)
-        .navigationBarBackButtonHidden(false)
-        .animation(.easeInOut(duration: 0.25), value: showComplete)
     }
     
     // MARK: - Custom Header
@@ -241,7 +259,7 @@ struct DayDetailView: View {
                 Image(systemName: "photo.stack.fill")
                     .font(.system(size: 12))
                     .foregroundStyle(PurgeColor.text)
-                Text("\(day.photoCount)")
+                Text("\(day?.photoCount ?? 0)")
                     .font(PurgeFont.mono(14, weight: .bold))
                     .foregroundStyle(PurgeColor.text)
             }
@@ -264,7 +282,7 @@ struct DayDetailView: View {
             HStack(spacing: 16) {
                 // Text
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("\(day.nearDuplicateSets.count) NEAR-DUP GROUPS")
+                    Text("\(day?.nearDuplicateSets.count ?? 0) NEAR-DUP GROUPS")
                         .font(PurgeFont.display(18, weight: .bold))
                         .foregroundStyle(PurgeColor.text)
                         .rotationEffect(.degrees(-1))
@@ -318,6 +336,7 @@ struct DayDetailView: View {
     }
 
     private func markAllNearDupes() {
+        guard let day else { return }
         var newSelection = selectedIDs
         for group in day.nearDuplicateSets {
             for id in group.dropFirst() { newSelection.insert(id) }
@@ -328,7 +347,7 @@ struct DayDetailView: View {
 
     private func clusterSection(index: Int, group: [String]) -> some View {
         let color = Self.groupColors[index % Self.groupColors.count]
-        let clusterPhotos = day.photos.filter { group.contains($0.localIdentifier ?? "") }
+        let clusterPhotos = (day?.photos ?? []).filter { (photo: DummyPhoto) in group.contains(photo.localIdentifier ?? "") }
         return VStack(alignment: .center, spacing: 12) {
             HStack(spacing: 8) {
                 Text("GROUP \(index + 1)")
@@ -483,9 +502,15 @@ struct DayDetailView: View {
                 Button(action: confirmDeletion) {
                     VStack(spacing: 2) {
                         HStack(spacing: 6) {
-                            Image(systemName: "trash.fill")
-                                .font(.system(size: 14, weight: .bold))
-                            Text("TRASH \(selectedIDs.count)")
+                            if isDeleting {
+                                ProgressView()
+                                    .tint(.white)
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "trash.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                            }
+                            Text(isDeleting ? "DELETING…" : "TRASH \(selectedIDs.count)")
                                 .font(PurgeFont.mono(14, weight: .bold))
                         }
                         Text("\(selectedMB) MB freed")
@@ -497,12 +522,13 @@ struct DayDetailView: View {
                     .padding(.vertical, 10)
                     .background(
                         ScrapbookNoteShape()
-                            .fill(PurgeColor.primary)
+                            .fill(isDeleting ? PurgeColor.primary.opacity(0.6) : PurgeColor.primary)
                             .stickerShadow()
                     )
                     .rotationEffect(.degrees(1))
                 }
                 .buttonStyle(ScrapbookButtonStyle())
+                .disabled(isDeleting)
             }
         }
         .padding(.horizontal, 24)
@@ -510,16 +536,24 @@ struct DayDetailView: View {
     }
 
     private func confirmDeletion() {
-        let idsToDelete = Array(selectedIDs)
-        PHPhotoLibrary.shared().performChanges {
-            let assets = PHAsset.fetchAssets(withLocalIdentifiers: idsToDelete, options: nil)
-            PHAssetChangeRequest.deleteAssets(assets)
-        } completionHandler: { _, _ in }
-        withAnimation { showComplete = true }
+        print("[PURGE-TRASH] DayDetailView.confirmDeletion START: selectedIDs=\(selectedIDs.count), scanEngine.isDeleting=\(scanEngine.isDeleting)")
+        guard !scanEngine.isDeleting, !selectedIDs.isEmpty else {
+            print("[PURGE-TRASH] DayDetailView.confirmDeletion SKIP: scanEngine.isDeleting=\(scanEngine.isDeleting), selectedIDs=\(selectedIDs.isEmpty ? "empty" : "has items")")
+            return
+        }
+        // isDeleting is now a computed property from scanEngine.isDeleting
+        // so we don't need to set it here - scanEngine.trashItems handles it
+        print("[PURGE-TRASH] DayDetailView.confirmDeletion: calling scanEngine.trashItems with \(selectedIDs.count) items")
+        scanEngine.trashItems(
+            identifiers: selectedIDs,
+            context: modelContext,
+            dismissCallback: { dismiss() }
+        )
+        print("[PURGE-TRASH] DayDetailView.confirmDeletion: trashItems returned")
     }
 }
 
 // MARK: - Preview
 #Preview {
-    DayDetailView(day: DayGroup.sampleDays[0])
+    DayDetailView(dayId: DayGroup.sampleDays[0].id)
 }

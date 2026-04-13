@@ -2,7 +2,6 @@ import SwiftUI
 import Photos
 import Vision
 import SwiftData
-import CoreLocation
 
 // MARK: - Scan Phase
 
@@ -69,6 +68,181 @@ final class ScanEngine {
     
     var totalNearDuplicateCount: Int { dayGroups.reduce(0) { $0 + $1.nearDuplicateCount } }
     var daysWithDuplicates: Int      { dayGroups.filter { $0.nearDuplicateCount > 0 }.count }
+
+    // MARK: - Trash Service (Centralized Deletion API)
+
+    /// Tracks identifiers currently being deleted. Views can observe this to show progress.
+    /// Set to `nil` when no deletion is in progress.
+    var pendingDeletion: Set<String>? {
+        didSet {
+            print("[PURGE-TRASH] pendingDeletion changed: \(oldValue?.count ?? 0) -> \(pendingDeletion?.count ?? 0)")
+        }
+    }
+
+    /// Tracks the deletion count for UI progress indicators.
+    var deletionCount: Int { pendingDeletion?.count ?? 0 }
+
+    /// Tracks whether a deletion is currently in progress.
+    var isDeleting: Bool { pendingDeletion != nil }
+
+    /// Phase 1: Deletes assets from the Photos library. Returns true if the user confirmed.
+    /// Does NOT mutate in-memory state — call `cleanupAfterDeletion` separately.
+    func performLibraryDeletion(identifiers: Set<String>) async -> Bool {
+        print("[PURGE-TRASH] performLibraryDeletion START: \(identifiers.count) items")
+        guard !identifiers.isEmpty else {
+            print("[PURGE-TRASH] performLibraryDeletion SKIP: empty identifiers")
+            return false
+        }
+
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: Array(identifiers), options: nil)
+        print("[PURGE-TRASH] performLibraryDeletion: found \(fetchResult.count) assets in Photos library")
+        guard fetchResult.count > 0 else { return false }
+
+        var assets: [PHAsset] = []
+        fetchResult.enumerateObjects { asset, _, _ in assets.append(asset) }
+
+        // Explicitly dispatch to a background queue to avoid blocking the main thread
+        // and prevent potential deadlocks with the Photos library.
+        let success = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                // Re-fetch assets inside the closure so they are captured as Sendable PHObject
+                // (PHAsset is Sendable when fetched fresh from the library).
+                let localIds = assets.map { $0.localIdentifier }
+                let fetchOptions = PHFetchOptions()
+                fetchOptions.predicate = NSPredicate(format: "localIdentifier IN %@", localIds)
+                let freshFetch = PHAsset.fetchAssets(with: fetchOptions)
+                var freshAssets: [PHAsset] = []
+                freshFetch.enumerateObjects { asset, _, _ in freshAssets.append(asset) }
+                let nsAssets = NSArray(array: freshAssets)
+
+                print("[PURGE-TRASH] performLibraryDeletion: executing PHPhotoLibrary.performChanges on background queue")
+                PHPhotoLibrary.shared().performChanges {
+                    PHAssetChangeRequest.deleteAssets(nsAssets)
+                } completionHandler: { ok, error in
+                    print("[PURGE-TRASH] performLibraryDeletion PHPhotoLibrary.performChanges completed: success=\(ok), error=\(error?.localizedDescription ?? "nil")")
+                    cont.resume(returning: ok)
+                }
+            }
+        }
+
+        print("[PURGE-TRASH] performLibraryDeletion END: success=\(success)")
+        return success
+    }
+
+    /// Phase 2: Update in-memory dayGroups and prune SwiftData after deletion.
+    /// Call this AFTER the presenting view has dismissed to avoid navigation crashes.
+    func cleanupAfterDeletion(identifiers: Set<String>, context: ModelContext) {
+        print("[PURGE-TRASH] cleanupAfterDeletion START: \(identifiers.count) items, dayGroups before=\(dayGroups.count)")
+        dayGroups = dayGroups.compactMap { day in
+            let remaining = day.photos.filter { !identifiers.contains($0.localIdentifier ?? "") }
+            guard !remaining.isEmpty else { return nil }
+            let prunedSets = day.nearDuplicateSets
+                .map { $0.filter { !identifiers.contains($0) } }
+                .filter { !$0.isEmpty }
+            return DayGroup(
+                id: day.id,
+                date: day.date,
+                location: day.location,
+                representativeLat: day.representativeLat,
+                representativeLng: day.representativeLng,
+                photos: remaining,
+                nearDuplicateSets: prunedSets
+            )
+        }
+
+        print("[PURGE-TRASH] cleanupAfterDeletion: dayGroups after=\(dayGroups.count)")
+        pruneSwiftData(identifiers: identifiers, context: context)
+        print("[PURGE-TRASH] cleanupAfterDeletion END")
+    }
+
+    /// Atomically trash items: sets pendingDeletion, performs library deletion,
+    /// dismisses via callback, then cleans up in-memory state.
+    /// Views should call this instead of the raw two-phase methods.
+    /// - Parameters:
+    ///   - identifiers: Set of photo localIdentifiers to trash
+    ///   - context: SwiftData ModelContext for pruning
+    ///   - dismissCallback: Closure to dismiss the presenting view (called before cleanup to avoid NavigationStack crash)
+    func trashItems(
+        identifiers: Set<String>,
+        context: ModelContext,
+        dismissCallback: @escaping () -> Void
+    ) {
+        print("[PURGE-TRASH] trashItems START: \(identifiers.count) items")
+        guard !identifiers.isEmpty, pendingDeletion == nil else {
+            print("[PURGE-TRASH] trashItems SKIP: identifiers=\(identifiers.isEmpty ? "empty" : "not empty"), pendingDeletion=\(pendingDeletion != nil ? "already set" : "nil")")
+            return
+        }
+        pendingDeletion = identifiers
+        print("[PURGE-TRASH] trashItems: pendingDeletion set to \(identifiers.count) items")
+
+        Task {
+            let success = await performLibraryDeletion(identifiers: identifiers)
+
+            guard success else {
+                print("[PURGE-TRASH] trashItems: performLibraryDeletion FAILED, clearing pendingDeletion")
+                await MainActor.run {
+                    pendingDeletion = nil
+                }
+                return
+            }
+
+            // Dismiss the presenting view FIRST, then mutate state.
+            // All views now read dynamically from scanEngine.dayGroups via Environment,
+            // so there's no risk of stale bindings even without a delay.
+            print("[PURGE-TRASH] trashItems: calling dismissCallback()")
+            await MainActor.run {
+                dismissCallback()
+            }
+            print("[PURGE-TRASH] trashItems: dismissCallback() completed, calling cleanupAfterDeletion")
+
+            await MainActor.run {
+                print("[PURGE-TRASH] trashItems: in MainActor, calling cleanupAfterDeletion")
+                cleanupAfterDeletion(identifiers: identifiers, context: context)
+                pendingDeletion = nil
+                print("[PURGE-TRASH] trashItems END: cleanupAfterDeletion done, pendingDeletion cleared")
+            }
+        }
+    }
+
+    /// Cancel any pending deletion (e.g., user backed out).
+    /// Returns true if there was a pending deletion to cancel.
+    @discardableResult
+    func cancelDeletion() -> Bool {
+        guard pendingDeletion != nil else { return false }
+        pendingDeletion = nil
+        return true
+    }
+
+    // MARK: - Prune SwiftData (internal helper)
+
+    private func pruneSwiftData(identifiers: Set<String>, context: ModelContext) {
+        print("[PURGE-TRASH] pruneSwiftData START: \(identifiers.count) identifiers")
+        var deletedAssetRecords = 0
+        var deletedClusters = 0
+        var updatedClusters = 0
+        
+        if let records = try? context.fetch(FetchDescriptor<AssetRecord>()) {
+            for record in records where identifiers.contains(record.localIdentifier) {
+                context.delete(record)
+                deletedAssetRecords += 1
+            }
+        }
+        if let clusters = try? context.fetch(FetchDescriptor<ClusterRecord>()) {
+            for cluster in clusters {
+                let pruned = cluster.assetIdentifiers.filter { !identifiers.contains($0) }
+                if pruned.isEmpty {
+                    context.delete(cluster)
+                    deletedClusters += 1
+                } else if pruned.count != cluster.assetIdentifiers.count {
+                    cluster.assetIdentifiers = pruned
+                    cluster.assetCount = pruned.count
+                    updatedClusters += 1
+                }
+            }
+        }
+        try? context.save()
+        print("[PURGE-TRASH] pruneSwiftData: deletedAssetRecords=\(deletedAssetRecords), deletedClusters=\(deletedClusters), updatedClusters=\(updatedClusters)")
+    }
 
     // MARK: - Load Existing Scan
 
@@ -447,13 +621,8 @@ final class ScanEngine {
     // MARK: - Geocoding (background, rate-limited)
 
     private func geocodeDayGroups() async {
-        let geocoder = CLGeocoder()
-        for i in 0..<dayGroups.count {
-            guard dayGroups[i].location.isEmpty else { continue }
-            // Geocoding would use repLat/repLng stored in ClusterRecord.
-            // Skipping for now — requires propagating coordinates to DayGroup.
-            _ = geocoder
-        }
+        // TODO: Replace CLGeocoder (deprecated iOS 26) with MKLocalSearch reverse geocoding.
+        // Requires propagating repLat/repLng coordinates through to DayGroup first.
     }
 
     // MARK: - Day Group Builders
@@ -558,12 +727,12 @@ final class ScanEngine {
     
     // Simple helper class to safely mutate boolean state across closures
     private final class SendableBox: @unchecked Sendable {
-        private var _value: Bool
+        private nonisolated(unsafe) var _value: Bool
         private let lock = NSLock()
         
         nonisolated init(_ value: Bool) { self._value = value }
         
-        func tryConsume() -> Bool {
+        nonisolated func tryConsume() -> Bool {
             lock.lock()
             defer { lock.unlock() }
             if !_value {

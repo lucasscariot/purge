@@ -41,39 +41,59 @@ struct ContentRootView: View {
     @Environment(\.modelContext)     private var modelContext
 
     var body: some View {
-        Group {
-            switch scanEngine.phase {
-            case .idle, .permissionDenied:
-                OnboardingView()
+        // Track dayGroups so ContentRootView recomputes when scanEngine.dayGroups
+        // changes (e.g. after photos are deleted). Without this, phase stays .complete
+        // and SwiftUI never re-evaluates the body.
+        let _ = scanEngine.dayGroups
 
-            case .rescanning, .requestingPermission:
-                HomeView(
-                    dayGroups: scanEngine.dayGroups,
-                    photoCount: scanEngine.photoCount,
-                    scanProgress: 0.01,
-                    currentPPS: scanEngine.currentPPS,
-                    onRescan: {}
-                )
+        switch scanEngine.phase {
+        case .idle:
+            emptyHomeView
 
-            case .enumerating, .analysing, .clustering, .complete:
-                HomeView(
-                    dayGroups: scanEngine.dayGroups,
-                    photoCount: scanEngine.photoCount,
-                    scanProgress: scanProgress,
-                    currentPPS: scanEngine.currentPPS,
-                    onRescan: { scanEngine.rescan(context: modelContext) }
-                )
+        case .rescanning, .requestingPermission:
+            HomeView(
+                photoCount: scanEngine.photoCount,
+                scanProgress: 0.01,
+                currentPPS: scanEngine.currentPPS,
+                onRescan: {}
+            )
 
-            case .error(let message):
-                errorView(message)
-            }
+        case .enumerating, .analysing, .clustering, .complete:
+            HomeView(
+                photoCount: scanEngine.photoCount,
+                scanProgress: scanProgress,
+                currentPPS: scanEngine.currentPPS,
+                onRescan: { scanEngine.rescan(context: modelContext) }
+            )
+
+        case .permissionDenied:
+            permissionDeniedView
+
+        case .error(let message):
+            errorView(message)
         }
-        .task {
-            // Load any previously completed scan on launch
-            if scanEngine.phase == .idle {
-                scanEngine.loadExistingClusters(context: modelContext)
+    }
+
+    private var emptyHomeView: some View {
+        HomeView(
+            photoCount: 0,
+            scanProgress: nil,
+            currentPPS: nil,
+            onRescan: { scanEngine.startScan(context: modelContext) }
+        )
+    }
+
+    private var permissionDeniedView: some View {
+        HomeView(
+            photoCount: 0,
+            scanProgress: nil,
+            currentPPS: nil,
+            onRescan: {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
             }
-        }
+        )
     }
 
     private var scanProgress: Double? {

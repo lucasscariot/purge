@@ -4,13 +4,21 @@ import SwiftUI
 // MARK: - HomeView
 
 struct HomeView: View {
-    let dayGroups: [DayGroup]
     let photoCount: Int
     let scanProgress: Double?
     let currentPPS: Double?
     var onRescan: () -> Void
 
+    @Environment(ScanEngine.self) private var scanEngine
     @State private var selectedDay: DayGroup?
+
+    private var dayGroups: [DayGroup] {
+        scanEngine.dayGroups
+    }
+
+    private var dynamicPhotoCount: Int {
+        scanEngine.photoCount
+    }
 
     var body: some View {
         NavigationStack {
@@ -65,7 +73,7 @@ struct HomeView: View {
             .ignoresSafeArea()
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(item: $selectedDay) { day in
-                DayDetailView(day: day)
+                DayDetailView(dayId: day.id)
             }
         }
     }
@@ -166,7 +174,7 @@ struct HomeView: View {
                 .font(PurgeFont.display(42, weight: .bold))
                 .foregroundStyle(PurgeColor.text)
             
-            Text("\(formatted(photoCount)) photos waiting to be organized")
+            Text("\(formatted(dynamicPhotoCount)) photos waiting to be organized")
                 .font(PurgeFont.ui(16, weight: .medium))
                 .foregroundStyle(PurgeColor.textMuted)
         }
@@ -254,13 +262,16 @@ struct DaySection: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            PhotoPileView(photos: day.photos, seed: day.id.hashValue)
-            
+            PinchablePhotoStack(photos: day.photos, seed: day.id.hashValue) {
+                selectedDay = day
+            }
+            .frame(width: 160, height: 160)
+
             VStack(alignment: .leading, spacing: 2) {
                 Text(formatDate(day.date))
                     .font(PurgeFont.display(16, weight: .bold))
                     .foregroundStyle(PurgeColor.text)
-                
+
                 if let locationText = locationDisplayString {
                     Text(locationText)
                         .font(PurgeFont.mono(10))
@@ -274,9 +285,6 @@ struct DaySection: View {
                 isPressed = pressing
             }
         })
-        .onTapGesture {
-            selectedDay = day
-        }
         .scaleEffect(isPressed ? 0.96 : 1.0)
     }
     
@@ -411,7 +419,6 @@ struct DotGridBackground: View {
 
 #Preview {
     HomeView(
-        dayGroups: DayGroup.sampleDays,
         photoCount: 4821,
         scanProgress: nil,
         currentPPS: nil,

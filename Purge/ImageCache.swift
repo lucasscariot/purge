@@ -12,8 +12,7 @@ final class ImageCache {
     private let lock = NSLock()
 
     private init() {
-        cachingImageManager.allowsCachingHighQualityImages = false
-    }
+}
     
     func requestImage(for asset: PHAsset, targetSize: CGSize, completion: @escaping (UIImage?) -> Void) {
         let options = PHImageRequestOptions()

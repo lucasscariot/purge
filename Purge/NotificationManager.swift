@@ -15,6 +15,6 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         print("NotificationManager: Foreground notification received: \(notification.request.content.title)")
         
         // Use .banner and .alert, .sound, .badge to ensure visibility
-        completionHandler([.banner, .alert, .sound, .badge])
+        completionHandler([.banner, .sound, .badge])
     }
 }
