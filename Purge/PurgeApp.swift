@@ -54,7 +54,17 @@ struct ContentRootView: View {
 
         switch scanEngine.phase {
         case .idle:
-            emptyHomeView
+            if scanEngine.dayGroups.isEmpty {
+                emptyHomeView
+            } else {
+                // Show existing scan results even in idle state
+                HomeView(
+                    photoCount: scanEngine.photoCount,
+                    scanProgress: nil,
+                    currentPPS: nil,
+                    onRescan: { scanEngine.rescan(context: modelContext) }
+                )
+            }
 
         case .rescanning, .requestingPermission:
             HomeView(
