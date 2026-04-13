@@ -261,8 +261,9 @@ final class ScanEngine {
 
             photoCount = allAssets.filter { !$0.isScreenshot }.count
 
-            let validGroups = records
-                .filter { $0.clusterType == "day" }
+            let dayRecords = records.filter { $0.clusterType == "day" }
+
+            let validGroups = dayRecords
                 .compactMap { buildDayGroup(from: $0, assetMap: assetMap) }
                 .filter { !$0.photos.isEmpty }
 

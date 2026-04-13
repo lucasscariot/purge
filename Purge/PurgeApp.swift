@@ -47,6 +47,17 @@ struct ContentRootView: View {
     @Environment(\.modelContext)     private var modelContext
 
     var body: some View {
+        rootContent
+            // Restore persisted scan results on app launch.
+            // Runs once when the view appears; loadExistingClusters sets
+            // phase = .complete and populates dayGroups if data exists.
+            .task {
+                scanEngine.loadExistingClusters(context: modelContext)
+            }
+    }
+
+    @ViewBuilder
+    private var rootContent: some View {
         // Track dayGroups so ContentRootView recomputes when scanEngine.dayGroups
         // changes (e.g. after photos are deleted). Without this, phase stays .complete
         // and SwiftUI never re-evaluates the body.
