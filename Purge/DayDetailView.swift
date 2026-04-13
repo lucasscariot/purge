@@ -453,23 +453,13 @@ struct DayDetailView: View {
     private var footer: some View {
         HStack(spacing: 16) {
             if selectedIDs.isEmpty {
-                Spacer()
-                // Single skip button as a sticker
                 Button { dismiss() } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 14, weight: .bold))
-                        Text("SKIP DAY")
-                            .font(PurgeFont.mono(14, weight: .bold))
-                    }
-                    .foregroundStyle(PurgeColor.textMuted)
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 12)
-                    .background(PurgeColor.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-                    .overlay(RoundedRectangle(cornerRadius: 2).strokeBorder(Color.white, lineWidth: 3))
-                    .stickerShadow()
-                    .rotationEffect(.degrees(1))
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(PurgeColor.textMuted)
+                        .frame(width: 44, height: 44)
+                        .background(PurgeColor.surface)
+                        .clipShape(Circle())
                 }
                 .buttonStyle(ScrapbookButtonStyle())
                 Spacer()
