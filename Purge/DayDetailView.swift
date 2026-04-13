@@ -124,6 +124,7 @@ struct DayDetailView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var selectedIDs: Set<String> = []
+    @State private var scale: CGFloat = 1.0
     // isDeleting is now derived from scanEngine.isDeleting, not a local state
     // that needs manual resetting
     private var isDeleting: Bool { scanEngine.isDeleting }
@@ -215,6 +216,18 @@ struct DayDetailView: View {
                     footer
                 }
             }
+            .scaleEffect(scale)
+            .gesture(
+                MagnificationGesture()
+                    .onChanged { value in
+                        scale = max(0.5, min(value, 4.0))
+                    }
+                    .onEnded { _ in
+                        withAnimation(.spring(duration: 0.35)) {
+                            scale = 1.0
+                        }
+                    }
+            )
             .toolbar(.visible, for: .navigationBar)
             .navigationBarBackButtonHidden(false)
         } else {
