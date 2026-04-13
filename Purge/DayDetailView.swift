@@ -207,6 +207,7 @@ struct DayDetailView: View {
                         
                         Color.clear.frame(height: 120) // clearance for footer
                     }
+                    .scaleEffect(scale)
                 }
                 .scrollIndicators(.hidden)
                 
@@ -216,7 +217,6 @@ struct DayDetailView: View {
                     footer
                 }
             }
-            .scaleEffect(scale)
             .gesture(
                 MagnificationGesture()
                     .onChanged { value in
