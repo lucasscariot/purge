@@ -1,56 +1,27 @@
 import SwiftUI
+import UIKit
 import Photos
 
-// MARK: - Photo tile with group badge
-private struct GroupPhotoTile: View {
+// MARK: - Async Photo Image
+
+private struct AsyncPhotoImage: View {
     let localIdentifier: String
     let placeholder: Color
-    let isSelected: Bool
-    let groupColor: Color?
-    let groupIndex: Int?
+    var targetSize: CGSize = CGSize(width: 800, height: 800)
 
     @State private var image: UIImage?
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            // Photo / placeholder
-            Group {
-                if let image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    Rectangle().fill(placeholder)
-                }
-            }
-            .clipped()
-
-            // Red overlay when selected
-            if isSelected {
-                PurgeColor.primary.opacity(0.45)
-            }
-
-            // Near-dup group badge — bottom-trailing, inside the tile
-            if let color = groupColor, let idx = groupIndex {
-                Text("\(idx + 1)")
-                    .font(PurgeFont.mono(9, weight: .semibold))
-                    .foregroundStyle(.black)
-                    .frame(width: 20, height: 20)
-                    .background(color)
-                    .clipShape(Circle())
-                    .padding(5)
-            }
-
-            // Selection check — top-trailing
-            if isSelected {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22, weight: .bold))
-                    .symbolRenderingMode(.palette)
-                    .foregroundStyle(.white, PurgeColor.primary)
-                    .padding(4)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        Group {
+            if let image {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                placeholder
             }
         }
+        .clipped()
         .task(id: localIdentifier) { await loadImage() }
     }
 
@@ -63,27 +34,100 @@ private struct GroupPhotoTile: View {
         let options = PHImageRequestOptions()
         options.isNetworkAccessAllowed = true
         options.deliveryMode = .opportunistic
-        options.isSynchronous = false
-
-        let size = CGSize(width: 400, height: 400)
-
-        let stream = AsyncStream<UIImage> { cont in
-            nonisolated(unsafe) var requestID: PHImageRequestID = PHInvalidImageRequestID
-            requestID = PHImageManager.default().requestImage(
-                for: asset, targetSize: size,
-                contentMode: .aspectFill, options: options
+        
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            var delivered = false
+            PHImageManager.default().requestImage(
+                for: asset,
+                targetSize: targetSize,
+                contentMode: .aspectFill,
+                options: options
             ) { img, info in
-                if let img { cont.yield(img) }
-                let isDone = (info?[PHImageResultIsDegradedKey] as? Bool) == false
-                if isDone { cont.finish() }
-            }
-            cont.onTermination = { _ in
-                if requestID != PHInvalidImageRequestID {
-                    PHImageManager.default().cancelImageRequest(requestID)
+                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) == true
+                if let img, !delivered {
+                    Task { @MainActor in self.image = img }
+                }
+                if !isDegraded && !delivered {
+                    delivered = true
+                    continuation.resume()
                 }
             }
         }
-        for await img in stream { image = img }
+    }
+}
+
+// MARK: - Natural Pinchable Tile
+
+private struct NaturalPinchableTile: View {
+    let localIdentifier: String
+    let placeholder: Color
+    let isSelected: Bool
+    let groupColor: Color?
+    let groupIndex: Int?
+    let cornerRadius: CGFloat
+    let rotation: Double
+    let onTap: () -> Void
+    var onZoomChange: ((Bool) -> Void)? = nil
+
+    @State private var currentScale: CGFloat = 1.0
+    @State private var isPinching: Bool = false
+
+    private var pinchGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                if !isPinching {
+                    isPinching = true
+                    onZoomChange?(true)
+                }
+                currentScale = max(1.0, value)
+            }
+            .onEnded { _ in
+                isPinching = false
+                onZoomChange?(false)
+                withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
+                    currentScale = 1.0
+                }
+            }
+    }
+
+    var body: some View {
+        AsyncPhotoImage(localIdentifier: localIdentifier, placeholder: placeholder)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipped()
+            .contentShape(Rectangle())
+            .overlay(alignment: .topTrailing) {
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 22, weight: .bold))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, PurgeColor.primary)
+                        .padding(4)
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if let color = groupColor, let idx = groupIndex {
+                    Text("\(idx + 1)")
+                        .font(PurgeFont.mono(9, weight: .semibold))
+                        .foregroundStyle(.black)
+                        .frame(width: 20, height: 20)
+                        .background(color)
+                        .clipShape(Circle())
+                        .padding(5)
+                }
+            }
+            .overlay {
+                if isSelected {
+                    PurgeColor.primary.opacity(0.45)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(.white, lineWidth: 4))
+            .stickerShadow()
+            .rotationEffect(.degrees(rotation))
+            .scaleEffect(currentScale, anchor: .center)
+            .zIndex(isPinching ? 100 : 0)
+            .gesture(pinchGesture)
+            .onTapGesture { onTap() }
     }
 }
 
@@ -93,24 +137,24 @@ struct ScrapbookNoteShape: Shape {
         var path = Path()
         let w = rect.width
         let h = rect.height
-        
+
         path.move(to: CGPoint(x: w * 0.01, y: h * 0.05))
         path.addLine(to: CGPoint(x: w * 0.3, y: h * 0.01))
         path.addLine(to: CGPoint(x: w * 0.7, y: h * 0.04))
         path.addLine(to: CGPoint(x: w * 0.99, y: h * 0.02))
-        
+
         path.addLine(to: CGPoint(x: w * 0.97, y: h * 0.4))
         path.addLine(to: CGPoint(x: w * 1.0, y: h * 0.8))
         path.addLine(to: CGPoint(x: w * 0.98, y: h * 0.98))
-        
+
         path.addLine(to: CGPoint(x: w * 0.6, y: h * 0.95))
         path.addLine(to: CGPoint(x: w * 0.2, y: h * 0.99))
         path.addLine(to: CGPoint(x: w * 0.02, y: h * 0.96))
-        
+
         path.addLine(to: CGPoint(x: w * 0.04, y: h * 0.6))
         path.addLine(to: CGPoint(x: w * 0.0, y: h * 0.3))
         path.closeSubpath()
-        
+
         return path
     }
 }
@@ -124,18 +168,13 @@ struct DayDetailView: View {
     @Environment(\.modelContext) private var modelContext
 
     @State private var selectedIDs: Set<String> = []
-    @State private var scale: CGFloat = 1.0
-    // isDeleting is now derived from scanEngine.isDeleting, not a local state
-    // that needs manual resetting
+    @State private var zoomingTileID: String? = nil
     private var isDeleting: Bool { scanEngine.isDeleting }
-    
-    // Look up the current day from scanEngine.dayGroups to get live updates
-    // when photos are deleted
+
     private var day: DayGroup? {
         scanEngine.dayGroups.first { $0.id == dayId }
     }
 
-    // Group colour palette — deterministic per index
     private static let groupColors: [Color] = [
         PurgeColor.warning,
         PurgeColor.teal,
@@ -185,62 +224,46 @@ struct DayDetailView: View {
 
                 ScrollView {
                     VStack(spacing: 32) {
-                        // Header and action card are now in the ScrollView
                         customHeader
-                        
+
                         if !day.nearDuplicateSets.isEmpty {
                             quickActionBar
                         }
-                        
+
                         ForEach(Array(day.nearDuplicateSets.enumerated()), id: \.offset) { i, group in
                             clusterSection(index: i, group: group)
                         }
-                        
+
                         let singles = day.photos.filter { photo in
                             let id = photo.localIdentifier ?? ""
                             return dupGroupMap[id] == nil
                         }
-                        
+
                         if !singles.isEmpty {
                             singlesSection(singles: singles)
                         }
-                        
-                        Color.clear.frame(height: 120) // clearance for footer
+
+                        Color.clear.frame(height: 120)
                     }
-                    .scaleEffect(scale)
                 }
                 .scrollIndicators(.hidden)
-                
-                // Footer floats over grid
+
                 VStack {
                     Spacer()
                     footer
                 }
             }
-            .gesture(
-                MagnificationGesture()
-                    .onChanged { value in
-                        scale = max(0.5, min(value, 4.0))
-                    }
-                    .onEnded { _ in
-                        withAnimation(.spring(duration: 0.35)) {
-                            scale = 1.0
-                        }
-                    }
-            )
             .toolbar(.visible, for: .navigationBar)
             .navigationBarBackButtonHidden(false)
         } else {
-            // Day not found — show empty state (may have been deleted)
             ZStack { Color.black }
         }
     }
-    
+
     // MARK: - Custom Header
-    
+
     private var customHeader: some View {
         HStack(alignment: .top) {
-            // Date / location sticker
             VStack(alignment: .leading, spacing: 4) {
                 if let loc = locationDisplayString {
                     Text(loc.uppercased())
@@ -267,7 +290,6 @@ struct DayDetailView: View {
 
             Spacer()
 
-            // Photo count pill
             HStack(spacing: 4) {
                 Image(systemName: "photo.stack.fill")
                     .font(.system(size: 12))
@@ -287,19 +309,17 @@ struct DayDetailView: View {
         .padding(.horizontal, 16)
     }
 
-
     // MARK: - Quick Action Bar
-    
+
     private var quickActionBar: some View {
         ZStack(alignment: .top) {
             HStack(spacing: 16) {
-                // Text
                 VStack(alignment: .leading, spacing: 8) {
                     Text("\(day?.nearDuplicateSets.count ?? 0) NEAR-DUP GROUPS")
                         .font(PurgeFont.display(18, weight: .bold))
                         .foregroundStyle(PurgeColor.text)
                         .rotationEffect(.degrees(-1))
-                    
+
                     Text("Tap a photo to select it for deletion, or use auto-select.")
                         .font(PurgeFont.mono(12))
                         .foregroundStyle(PurgeColor.text.opacity(0.8))
@@ -310,7 +330,6 @@ struct DayDetailView: View {
 
                 Spacer()
 
-            // Auto-select button
                 Button(action: markAllNearDupes) {
                     VStack(spacing: 4) {
                         Image(systemName: "wand.and.sparkles")
@@ -336,7 +355,7 @@ struct DayDetailView: View {
                     .stickerShadow()
             )
             .rotationEffect(.degrees(-2))
-            
+
             Rectangle()
                 .fill(Color.white.opacity(0.6))
                 .frame(width: 45, height: 14)
@@ -360,7 +379,9 @@ struct DayDetailView: View {
 
     private func clusterSection(index: Int, group: [String]) -> some View {
         let color = Self.groupColors[index % Self.groupColors.count]
-        let clusterPhotos = (day?.photos ?? []).filter { (photo: DummyPhoto) in group.contains(photo.localIdentifier ?? "") }
+        let clusterPhotos = (day?.photos ?? []).filter { (photo: DummyPhoto) in
+            group.contains(photo.localIdentifier ?? "")
+        }
         return VStack(alignment: .center, spacing: 12) {
             HStack(spacing: 8) {
                 Text("GROUP \(index + 1)")
@@ -373,37 +394,37 @@ struct DayDetailView: View {
                     .overlay(Capsule().strokeBorder(Color.white, lineWidth: 2))
                     .stickerShadow()
                     .rotationEffect(.degrees(-1))
-                
+
                 Text("— \(group.count) photos")
                     .font(PurgeFont.mono(12))
                     .foregroundStyle(PurgeColor.textMuted)
             }
             .padding(.horizontal, 16)
-            
-            StaggeredGrid(clusterPhotos, columns: 2, spacing: 16) { photo in
+
+            StaggeredGrid(clusterPhotos, columns: 2, spacing: 16, itemSize: CGSize(width: 160, height: 200)) { photo in
                 let id = photo.localIdentifier ?? ""
                 let isSelected = selectedIDs.contains(id)
                 let placeholder = photo.color
-                
-                GroupPhotoTile(
+
+                NaturalPinchableTile(
                     localIdentifier: id,
                     placeholder: placeholder,
                     isSelected: isSelected,
                     groupColor: color,
-                    groupIndex: index
+                    groupIndex: index,
+                    cornerRadius: 12,
+                    rotation: Double(abs(id.hashValue) % 9) - 4.0,
+                    onTap: { toggleSelection(for: id) },
+                    onZoomChange: { isZooming in
+                        if isZooming { zoomingTileID = id }
+                        else if zoomingTileID == id { zoomingTileID = nil }
+                    }
                 )
-                .aspectRatio(contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.white, lineWidth: 4))
-                .stickerShadow()
-                .rotationEffect(.degrees(Double(abs(id.hashValue) % 9) - 4.0))
-                .onTapGesture {
-                    toggleSelection(for: id)
-                }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+        .zIndex(group.contains(zoomingTileID ?? "") ? 100 : 0)
     }
 
     private func singlesSection(singles: [DummyPhoto]) -> some View {
@@ -419,38 +440,39 @@ struct DayDetailView: View {
                     .overlay(Capsule().strokeBorder(Color.white, lineWidth: 2))
                     .stickerShadow()
                     .rotationEffect(.degrees(1))
-                
+
                 Text("— \(singles.count) photos")
                     .font(PurgeFont.mono(12))
                     .foregroundStyle(PurgeColor.textMuted)
             }
             .padding(.horizontal, 16)
-            
+
             FlowLayout(spacing: 16) {
                 ForEach(singles) { photo in
                     let id = photo.localIdentifier ?? ""
                     let isSelected = selectedIDs.contains(id)
-                    
-                    GroupPhotoTile(
+
+                    NaturalPinchableTile(
                         localIdentifier: id,
                         placeholder: photo.color,
                         isSelected: isSelected,
                         groupColor: nil,
-                        groupIndex: nil
+                        groupIndex: nil,
+                        cornerRadius: 8,
+                        rotation: Double(abs(id.hashValue) % 9) - 4.0,
+                        onTap: { toggleSelection(for: id) },
+                        onZoomChange: { isZooming in
+                            if isZooming { zoomingTileID = id }
+                            else if zoomingTileID == id { zoomingTileID = nil }
+                        }
                     )
                     .frame(width: 120, height: 120)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.white, lineWidth: 4))
-                    .stickerShadow()
-                    .rotationEffect(.degrees(Double(abs(id.hashValue) % 9) - 4.0))
-                    .onTapGesture {
-                        toggleSelection(for: id)
-                    }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
         }
+        .zIndex(singles.contains(where: { $0.localIdentifier == zoomingTileID }) ? 100 : 0)
     }
 
     private func toggleSelection(for id: String) {
@@ -462,7 +484,7 @@ struct DayDetailView: View {
     }
 
     // MARK: - Footer
-    
+
     private var footer: some View {
         HStack(spacing: 16) {
             if selectedIDs.isEmpty {
@@ -492,7 +514,6 @@ struct DayDetailView: View {
 
                 Spacer()
 
-                // Trash — right half, solid red
                 Button(action: confirmDeletion) {
                     VStack(spacing: 2) {
                         HStack(spacing: 6) {
@@ -530,20 +551,12 @@ struct DayDetailView: View {
     }
 
     private func confirmDeletion() {
-        print("[PURGE-TRASH] DayDetailView.confirmDeletion START: selectedIDs=\(selectedIDs.count), scanEngine.isDeleting=\(scanEngine.isDeleting)")
-        guard !scanEngine.isDeleting, !selectedIDs.isEmpty else {
-            print("[PURGE-TRASH] DayDetailView.confirmDeletion SKIP: scanEngine.isDeleting=\(scanEngine.isDeleting), selectedIDs=\(selectedIDs.isEmpty ? "empty" : "has items")")
-            return
-        }
-        // isDeleting is now a computed property from scanEngine.isDeleting
-        // so we don't need to set it here - scanEngine.trashItems handles it
-        print("[PURGE-TRASH] DayDetailView.confirmDeletion: calling scanEngine.trashItems with \(selectedIDs.count) items")
+        guard !scanEngine.isDeleting, !selectedIDs.isEmpty else { return }
         scanEngine.trashItems(
             identifiers: selectedIDs,
             context: modelContext,
             dismissCallback: { dismiss() }
         )
-        print("[PURGE-TRASH] DayDetailView.confirmDeletion: trashItems returned")
     }
 }
 
