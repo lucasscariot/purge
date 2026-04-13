@@ -453,15 +453,6 @@ struct DayDetailView: View {
     private var footer: some View {
         HStack(spacing: 16) {
             if selectedIDs.isEmpty {
-                Button { dismiss() } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(PurgeColor.textMuted)
-                        .frame(width: 44, height: 44)
-                        .background(PurgeColor.surface)
-                        .clipShape(Circle())
-                }
-                .buttonStyle(ScrapbookButtonStyle())
                 Spacer()
             } else {
                 // Clear — left half
