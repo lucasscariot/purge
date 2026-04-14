@@ -18,29 +18,24 @@ struct DayDetailOverlay: View {
     ]
     
     // Group photos by their near-duplicate sets
-    private var organizedPhotos: [[DummyPhoto]] {
+    private var organizedGroups: [(isNearDuplicate: Bool, photos: [DummyPhoto])] {
         let nearDupIds = Set(dayGroup.nearDuplicateSets.flatMap { $0 })
         
-        // First, group near duplicates by their set
-        var nearDuplicateGroups: [[DummyPhoto]] = []
+        var result: [(Bool, [DummyPhoto])] = []
         for set in dayGroup.nearDuplicateSets {
             let photosInSet = dayGroup.photos.filter { set.contains($0.localIdentifier ?? "") }
             if !photosInSet.isEmpty {
-                nearDuplicateGroups.append(photosInSet)
+                result.append((true, photosInSet))
             }
         }
         
-        // Then get regular photos (not in any near-duplicate set)
         let regularPhotos = dayGroup.photos.filter { photo in
             guard let id = photo.localIdentifier else { return true }
             return !nearDupIds.contains(id)
         }
         
-        // Combine: near duplicates first, then regular photos
-        var result: [[DummyPhoto]] = []
-        result.append(contentsOf: nearDuplicateGroups)
         if !regularPhotos.isEmpty {
-            result.append(regularPhotos)
+            result.append((false, regularPhotos))
         }
         return result
     }
@@ -54,6 +49,58 @@ struct DayDetailOverlay: View {
         return dayGroup.nearDuplicateSets.flatMap { $0 }.contains(id)
     }
     
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM yyyy"
+        return formatter.string(from: date).uppercased()
+    }
+    
+    private func selectAll() {
+        withAnimation {
+            isSelectionMode = true
+            let allIds = dayGroup.photos.compactMap { $0.localIdentifier }
+            selectedPhotos.formUnion(allIds)
+        }
+    }
+    
+    private func selectGroup(_ group: [DummyPhoto]) {
+        withAnimation {
+            isSelectionMode = true
+            let groupIds = group.compactMap { $0.localIdentifier }
+            selectedPhotos.formUnion(groupIds)
+        }
+    }
+    
+    private func applyAISelection() {
+        var toSelect: Set<String> = []
+        for set in dayGroup.nearDuplicateSets {
+            let assets = PHAsset.fetchAssets(withLocalIdentifiers: set, options: nil)
+            var assetList: [PHAsset] = []
+            assets.enumerateObjects { asset, _, _ in assetList.append(asset) }
+            
+            let sorted = assetList.sorted { a, b in
+                if a.isFavorite != b.isFavorite { return a.isFavorite }
+                return (a.creationDate ?? Date.distantPast) > (b.creationDate ?? Date.distantPast)
+            }
+            
+            guard let best = sorted.first else { continue }
+            let keepId = best.localIdentifier
+            
+            for id in set {
+                if id == keepId { continue }
+                if let asset = assetList.first(where: { $0.localIdentifier == id }), asset.isFavorite {
+                    continue
+                }
+                toSelect.insert(id)
+            }
+        }
+        
+        withAnimation {
+            isSelectionMode = true
+            selectedPhotos.formUnion(toSelect)
+        }
+    }
+    
     var body: some View {
         GeometryReader { _ in
             ZStack {
@@ -61,27 +108,79 @@ struct DayDetailOverlay: View {
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
-                    LazyVStack(spacing: 16) {
-                        ForEach(0..<organizedPhotos.count, id: \.self) { index in
-                            let photoGroup = organizedPhotos[index]
-
-                            // Add separator between near-duplicate groups
-                            if index > 0 && hasNearDuplicates {
-                                Divider()
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                            }
-
-                            LazyVGrid(columns: columns, spacing: 8) {
-                                ForEach(photoGroup) { photo in
-                                    photoCard(photo: photo)
+                    VStack(spacing: 24) {
+                        VStack(spacing: 12) {
+                            Text(formattedDate(dayGroup.date))
+                                .font(.system(size: 18, weight: .medium, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.8))
+                            
+                            HStack(spacing: 16) {
+                                Button(action: selectAll) {
+                                    Text("Select All")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(RoundedRectangle(cornerRadius: 16).fill(.white.opacity(0.2)))
+                                        .foregroundStyle(.white)
+                                }
+                                
+                                if hasNearDuplicates {
+                                    Button(action: applyAISelection) {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "wand.and.stars")
+                                            Text("AI Select")
+                                        }
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .padding(.horizontal, 16)
+                                        .padding(.vertical, 8)
+                                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.blue.opacity(0.8)))
+                                        .foregroundStyle(.white)
+                                    }
                                 }
                             }
                         }
+                        .padding(.top, 40)
+                        
+                        LazyVStack(spacing: 24) {
+                            ForEach(0..<organizedGroups.count, id: \.self) { index in
+                                let group = organizedGroups[index]
+
+                                VStack(spacing: 12) {
+                                    if group.isNearDuplicate {
+                                        HStack {
+                                            Image(systemName: "rectangle.stack.fill")
+                                                .foregroundStyle(.orange)
+                                            Text("Similar Photos")
+                                                .font(.system(size: 15, weight: .semibold))
+                                                .foregroundStyle(.white)
+                                            Spacer()
+                                            Button(action: { selectGroup(group.photos) }) {
+                                                Text("Select Group")
+                                                    .font(.system(size: 13, weight: .semibold))
+                                                    .foregroundStyle(.blue)
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 4)
+                                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue.opacity(0.15)))
+                                            }
+                                        }
+                                        .padding(.horizontal, 16)
+                                    } else if index > 0 && hasNearDuplicates {
+                                        Divider()
+                                            .padding(.horizontal, 16)
+                                            .padding(.bottom, 8)
+                                    }
+
+                                    LazyVGrid(columns: columns, spacing: 8) {
+                                        ForEach(group.photos) { photo in
+                                            photoCard(photo: photo)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 120)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.top, 60)
-                    .padding(.bottom, 120)
                 }
                 .scrollDisabled(isAnyPhotoZooming)
                 .background(
