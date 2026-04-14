@@ -2,8 +2,6 @@ import SwiftUI
 import SwiftData
 @preconcurrency import Photos
 
-// MARK: - HomeView
-
 struct HomeView: View {
     let photoCount: Int
     let scanProgress: Double?
@@ -12,7 +10,6 @@ struct HomeView: View {
 
     @Environment(ScanEngine.self) private var scanEngine
     @Environment(\.modelContext) private var modelContext
-    @State private var selectedDay: DayGroup?
     @Query private var memorySavedRecords: [MemorySaved]
 
     private var totalMemorySaved: Int64 {
@@ -40,35 +37,17 @@ struct HomeView: View {
                 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 48) {
-                        VStack(spacing: 0) {
-                            Color.clear.frame(height: topSafeArea)
-                            scrollingHeader
-                        }
-                        .padding(.top, -32)
+                        Color.clear.frame(height: topSafeArea)
                         
                         heroSection
                             .padding(.top, 16)
-                        
-                        onThisDaySection
-                            .padding(.top, -16)
                         
                         if scanProgress != nil {
                             scanningState
                         } else if dayGroups.isEmpty {
                             emptyState
                         } else {
-                            let columns = [
-                                GridItem(.flexible(), spacing: 24),
-                                GridItem(.flexible(), spacing: 24)
-                            ]
-                            LazyVGrid(columns: columns, spacing: 24) {
-                                ForEach(dayGroups.sorted(by: { $0.date > $1.date })) { day in
-                                    DaySection(day: day) { selected in
-                                        selectedDay = selected
-                                    }
-                                }
-                            }
-                            .padding(.horizontal, 24)
+                            statsSection
                         }
                         
                         Color.clear.frame(height: 120)
@@ -87,49 +66,6 @@ struct HomeView: View {
             }
             .ignoresSafeArea()
             .toolbar(.hidden, for: .navigationBar)
-            .navigationDestination(item: $selectedDay) { day in
-                DayDetailView(dayId: day.id)
-                    .onAppear {
-                        let formatter = DateFormatter()
-                        formatter.dateFormat = "yyyy-MM-dd"
-                        AnalyticsService.logDayOpened(
-                            photoCount: day.photoCount,
-                            date: formatter.string(from: day.date)
-                        )
-                    }
-            }
-        }
-    }
-    
-    // MARK: - Scrolling Header
-    
-    private var scrollingHeader: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Spacer()
-                
-                if let progress = scanProgress {
-                    Text("Scanning \(Int(max(1, progress * 100)))%")
-                        .font(PurgeFont.ui(13, weight: .bold))
-                        .foregroundStyle(PurgeColor.textMuted)
-                        .transition(.opacity)
-                }
-            }
-            .padding(.horizontal, 24)
-            .frame(height: 60)
-            
-            if let progress = scanProgress {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        PurgeColor.text.opacity(0.05)
-                        PurgeColor.mustard
-                            .frame(width: geo.size.width * max(0.01, progress))
-                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: progress)
-                    }
-                }
-                .frame(height: 3)
-                .transition(.opacity)
-            }
         }
     }
     
@@ -137,54 +73,6 @@ struct HomeView: View {
         let scenes = UIApplication.shared.connectedScenes
         let windowScene = scenes.first as? UIWindowScene
         return windowScene?.windows.first?.safeAreaInsets.top ?? 44
-    }
-    
-    // MARK: - On This Day
-    
-    @ViewBuilder
-    private var onThisDaySection: some View {
-        let currentMonth = Calendar.current.component(.month, from: Date())
-        let currentDay = Calendar.current.component(.day, from: Date())
-        let currentYear = Calendar.current.component(.year, from: Date())
-        
-        let pastDays = dayGroups.filter { group in
-            let month = Calendar.current.component(.month, from: group.date)
-            let day = Calendar.current.component(.day, from: group.date)
-            let year = Calendar.current.component(.year, from: group.date)
-            return month == currentMonth && day == currentDay && year < currentYear
-        }
-        
-        if !pastDays.isEmpty {
-            VStack(alignment: .leading, spacing: 16) {
-                Text("On This Day")
-                    .font(PurgeFont.display(24, weight: .bold))
-                    .foregroundStyle(PurgeColor.text)
-                    .padding(.horizontal, 24)
-                
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 24) {
-                        ForEach(pastDays.sorted(by: { Calendar.current.component(.year, from: $0.date) > Calendar.current.component(.year, from: $1.date) }), id: \.id) { group in
-                            let year = Calendar.current.component(.year, from: group.date)
-                            
-                            VStack(alignment: .center, spacing: 12) {
-                                PinchablePhotoStack(photos: group.photos, seed: group.id.hashValue) {
-                                    selectedDay = group
-                                }
-                                .frame(width: 140, height: 140)
-                                .stickerShadow()
-                                .rotationEffect(.degrees(Double((year * 7) % 11) - 5.0))
-                                
-                                Text(String(year))
-                                    .font(PurgeFont.mono(14, weight: .bold))
-                                    .foregroundStyle(PurgeColor.text)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 8)
-                }
-            }
-        }
     }
     
     // MARK: - Hero
@@ -214,6 +102,32 @@ struct HomeView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
     
+    // MARK: - Stats Section
+    
+    private var statsSection: some View {
+        VStack(spacing: 24) {
+            HStack(spacing: 16) {
+                statCard(title: "Days", value: "\(dayGroups.count)")
+                statCard(title: "Photos", value: "\(dayGroups.reduce(0) { $0 + $1.photoCount })")
+            }
+        }
+        .padding(.horizontal, 24)
+    }
+    
+    private func statCard(title: String, value: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(PurgeFont.display(32, weight: .bold))
+                .foregroundStyle(PurgeColor.text)
+            Text(title)
+                .font(PurgeFont.ui(14, weight: .medium))
+                .foregroundStyle(PurgeColor.textMuted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 24)
+        .background(PurgeColor.mustard.opacity(0.15), in: RoundedRectangle(cornerRadius: 16))
+    }
+    
     // MARK: - Rescan Button
     
     private var rescanButton: some View {
@@ -241,10 +155,10 @@ struct HomeView: View {
         VStack(spacing: 16) {
             ProgressView().tint(PurgeColor.mustard)
                 .scaleEffect(1.5)
-            Text("Gathering your memories…")
+            Text("Gathering your memories...")
                 .font(PurgeFont.ui(16, weight: .bold))
                 .foregroundStyle(PurgeColor.textMuted)
-                
+            
             if let pps = currentPPS, pps > 0 {
                 Text(String(format: "Dev Mode: %.1f photos/sec", pps))
                     .font(PurgeFont.mono(12))
@@ -281,73 +195,6 @@ struct HomeView: View {
         formatter.allowedUnits = [.useAll]
         formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
-    }
-}
-
-// MARK: - Day Section
-
-struct DaySection: View {
-    let day: DayGroup
-    let onSelect: (DayGroup) -> Void
-    @State private var isPressed = false
-    
-    private var locationDisplayString: String? {
-        if !day.location.isEmpty { return day.location }
-        if let lat = day.representativeLat, let lng = day.representativeLng {
-            return String(format: "%.1f°%@, %.1f°%@", abs(lat), lat >= 0 ? "N" : "S", abs(lng), lng >= 0 ? "E" : "W")
-        }
-        return nil
-    }
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            PinchablePhotoStack(photos: day.photos, seed: day.id.hashValue) {
-                onSelect(day)
-            }
-            .frame(width: 160, height: 160)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(formatDate(day.date))
-                    .font(PurgeFont.display(16, weight: .bold))
-                    .foregroundStyle(PurgeColor.text)
-
-                if let locationText = locationDisplayString {
-                    Text(locationText)
-                        .font(PurgeFont.mono(10))
-                        .foregroundStyle(PurgeColor.textMuted)
-                }
-            }
-            .padding(.horizontal, 4)
-        }
-        .onLongPressGesture(minimumDuration: .infinity, maximumDistance: .infinity, perform: {}, onPressingChanged: { pressing in
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                isPressed = pressing
-            }
-        })
-        .scaleEffect(isPressed ? 0.96 : 1.0)
-    }
-    
-    private func formatDate(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "d MMMM"
-        return f.string(from: date)
-    }
-}
-
-private final class SendableBox: @unchecked Sendable {
-    private var _value: Bool
-    private let lock = NSLock()
-    
-    init(_ value: Bool) { self._value = value }
-    
-    func tryConsume() -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        if !_value {
-            _value = true
-            return true
-        }
-        return false
     }
 }
 
