@@ -144,13 +144,14 @@ struct HomeView: View {
                 }
                 .padding(.horizontal, 24)
             }
-            .scrollClipDisabled()
         }
     }
     
     private func photoStackItem(group: DayGroup) -> some View {
         PinchablePhotoStack(photos: group.photos, seed: group.id.hashValue) {}
-            .frame(width: 130, height: 130)
+            .frame(width: 120, height: 120)
+            .fixedSize()
+            .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
     }
