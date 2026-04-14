@@ -55,19 +55,43 @@ struct DayDetailOverlay: View {
         return formatter.string(from: date).uppercased()
     }
     
+    private var isAllSelected: Bool {
+        let allIds = dayGroup.photos.compactMap { $0.localIdentifier }
+        return !allIds.isEmpty && allIds.allSatisfy { selectedPhotos.contains($0) }
+    }
+    
     private func selectAll() {
         withAnimation {
-            isSelectionMode = true
             let allIds = dayGroup.photos.compactMap { $0.localIdentifier }
-            selectedPhotos.formUnion(allIds)
+            if isAllSelected {
+                selectedPhotos.subtract(allIds)
+                if selectedPhotos.isEmpty {
+                    isSelectionMode = false
+                }
+            } else {
+                isSelectionMode = true
+                selectedPhotos.formUnion(allIds)
+            }
         }
+    }
+    
+    private func isGroupSelected(_ group: [DummyPhoto]) -> Bool {
+        let groupIds = group.compactMap { $0.localIdentifier }
+        return !groupIds.isEmpty && groupIds.allSatisfy { selectedPhotos.contains($0) }
     }
     
     private func selectGroup(_ group: [DummyPhoto]) {
         withAnimation {
-            isSelectionMode = true
             let groupIds = group.compactMap { $0.localIdentifier }
-            selectedPhotos.formUnion(groupIds)
+            if isGroupSelected(group) {
+                selectedPhotos.subtract(groupIds)
+                if selectedPhotos.isEmpty {
+                    isSelectionMode = false
+                }
+            } else {
+                isSelectionMode = true
+                selectedPhotos.formUnion(groupIds)
+            }
         }
     }
     
@@ -116,11 +140,11 @@ struct DayDetailOverlay: View {
                             
                             HStack(spacing: 16) {
                                 Button(action: selectAll) {
-                                    Text("Select All")
+                                    Text(isAllSelected ? "Unselect All" : "Select All")
                                         .font(.system(size: 14, weight: .semibold))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
-                                        .background(RoundedRectangle(cornerRadius: 16).fill(.white.opacity(0.2)))
+                                        .background(RoundedRectangle(cornerRadius: 16).fill(isAllSelected ? Color.blue.opacity(0.8) : .white.opacity(0.2)))
                                         .foregroundStyle(.white)
                                 }
                                 
@@ -139,7 +163,7 @@ struct DayDetailOverlay: View {
                                 }
                             }
                         }
-                        .padding(.top, 40)
+                        .padding(.top, 80)
                         
                         LazyVStack(spacing: 24) {
                             ForEach(0..<organizedGroups.count, id: \.self) { index in
@@ -155,12 +179,13 @@ struct DayDetailOverlay: View {
                                                 .foregroundStyle(.white)
                                             Spacer()
                                             Button(action: { selectGroup(group.photos) }) {
-                                                Text("Select Group")
+                                                let selected = isGroupSelected(group.photos)
+                                                Text(selected ? "Unselect Group" : "Select Group")
                                                     .font(.system(size: 13, weight: .semibold))
-                                                    .foregroundStyle(.blue)
+                                                    .foregroundStyle(selected ? .white : .blue)
                                                     .padding(.horizontal, 10)
                                                     .padding(.vertical, 4)
-                                                    .background(RoundedRectangle(cornerRadius: 12).fill(Color.blue.opacity(0.15)))
+                                                    .background(RoundedRectangle(cornerRadius: 12).fill(selected ? Color.blue.opacity(0.8) : Color.blue.opacity(0.15)))
                                             }
                                         }
                                         .padding(.horizontal, 16)
