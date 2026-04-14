@@ -93,7 +93,8 @@ struct ContentRootView: View {
                     photoCount: scanEngine.photoCount,
                     scanProgress: nil,
                     currentPPS: nil,
-                    onRescan: { scanEngine.rescan(context: modelContext) }
+                    onRescan: { scanEngine.rescan(context: modelContext) },
+                    onStartReview: nil  // TODO: navigate to review flow
                 )
             }
 

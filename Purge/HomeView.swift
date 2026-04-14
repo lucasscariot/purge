@@ -8,6 +8,7 @@ struct HomeView: View {
     let scanProgress: Double?
     let currentPPS: Double?
     var onRescan: () -> Void
+    var onStartReview: (() -> Void)? = nil
 
     @Environment(ScanEngine.self) private var scanEngine
     @Environment(\.modelContext) private var modelContext
@@ -49,6 +50,11 @@ struct HomeView: View {
                             emptyState
                         } else {
                             statsSection
+                                .transition(.movingParts.blinds)
+                            
+                            reviewPrompt
+                                .padding(.top, 16)
+                                .transition(.movingParts.boing)
                         }
                         
                         Color.clear.frame(height: 120)
@@ -168,6 +174,26 @@ struct HomeView: View {
                 }
             }
         }
+    }
+    
+    // MARK: - Review Prompt
+    
+    private var reviewPrompt: some View {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            onStartReview?()
+        }) {
+            HStack {
+                Image(systemName: "hand.draw")
+                Text("Start Reviewing")
+                    .font(PurgeFont.ui(18, weight: .bold))
+            }
+            .foregroundStyle(Color.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 18)
+            .background(PurgeColor.mustard, in: RoundedRectangle(cornerRadius: 16))
+        }
+        .buttonStyle(ScrapbookButtonStyle())
     }
     
     // MARK: - Placeholders
