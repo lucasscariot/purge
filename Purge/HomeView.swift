@@ -80,7 +80,14 @@ struct HomeView: View {
                 if let group = selectedDayGroup {
                     DayDetailOverlay(
                         dayGroup: group,
-                        onDismiss: { selectedDayGroup = nil }
+                        onDismiss: { selectedDayGroup = nil },
+                        onRemovePhotos: { identifiers in
+                            scanEngine.trashItems(
+                                identifiers: Set(identifiers),
+                                context: modelContext,
+                                dismissCallback: { selectedDayGroup = nil }
+                            )
+                        }
                     )
                 }
             }
@@ -226,10 +233,18 @@ struct HomeView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12))
                 .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
             
-            Text(formattedDate(group.date))
-                .font(PurgeFont.cursive(14))
-                .fontWeight(.medium)
-                .foregroundStyle(PurgeColor.textMuted)
+            VStack(spacing: 2) {
+                Text(formattedDate(group.date))
+                    .font(PurgeFont.cursive(14))
+                    .fontWeight(.medium)
+                    .foregroundStyle(PurgeColor.textMuted)
+                
+                if group.nearDuplicateCount > 0 {
+                    Text("\(group.nearDuplicateCount) near-dups")
+                        .font(PurgeFont.cursive(10))
+                        .foregroundStyle(PurgeColor.warning)
+                }
+            }
         }
     }
     
