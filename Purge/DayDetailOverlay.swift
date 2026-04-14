@@ -278,16 +278,6 @@ struct DayDetailOverlay: View {
                             .background(Circle().fill(Color.blue))
                     }
                 }
-            
-            if isNearDup {
-                Image(systemName: "rectangle.stack.fill")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
-                    .padding(8)
-                    .background(Circle().fill(Color.orange.opacity(0.9)))
-                    .padding(8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-            }
         }
         .frame(width: 180, height: 180)
         .contentShape(Rectangle())
