@@ -128,7 +128,7 @@ struct DayDetailOverlay: View {
     var body: some View {
         GeometryReader { _ in
             ZStack {
-                Color.black.opacity(0.3)
+                Color.clear
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
@@ -246,7 +246,6 @@ struct DayDetailOverlay: View {
     
     @ViewBuilder
     private func photoCard(photo: DummyPhoto) -> some View {
-        let isNearDup = isNearDuplicate(photo)
         let isSelected = selectedPhotos.contains(photo.localIdentifier ?? "")
         
         ZStack {

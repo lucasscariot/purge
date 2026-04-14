@@ -122,6 +122,11 @@ final class PhotoStackOverlayView: UIView {
         container.layer.cornerRadius  = cardCornerRadius
         container.layer.cornerCurve   = .continuous
         container.layer.masksToBounds = false
+        
+        container.layer.shadowColor = UIColor.black.cgColor
+        container.layer.shadowOpacity = 0.12
+        container.layer.shadowOffset = CGSize(width: 0, height: 4)
+        container.layer.shadowRadius = 8
 
         let iv = UIImageView(frame: container.bounds)
         iv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -130,15 +135,23 @@ final class PhotoStackOverlayView: UIView {
         iv.layer.cornerRadius = cardCornerRadius
         iv.layer.cornerCurve  = .continuous
         iv.backgroundColor    = UIColor(photo.color)
+        
+        iv.layer.borderWidth = 3
+        iv.layer.borderColor = UIColor.white.cgColor
+        
         container.addSubview(iv)
 
         if let localId = photo.localIdentifier {
-            let result = PHAsset.fetchAssets(withLocalIdentifiers: [localId], options: nil)
-            if let asset = result.firstObject {
-                ImageCache.shared.requestImage(
-                    for: asset, targetSize: CGSize(width: 320, height: 320)
-                ) { [weak iv] img in
-                    DispatchQueue.main.async { iv?.image = img }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let result = PHAsset.fetchAssets(withLocalIdentifiers: [localId], options: nil)
+                if let asset = result.firstObject {
+                    Task { @MainActor in
+                        ImageCache.shared.requestImage(
+                            for: asset, targetSize: CGSize(width: 320, height: 320)
+                        ) { [weak iv] img in
+                            DispatchQueue.main.async { iv?.image = img }
+                        }
+                    }
                 }
             }
         }
@@ -224,7 +237,7 @@ final class PhotoStackView: UIView {
 
     private var photos:     [DummyPhoto] = []
     private var seed:       Int = 0
-    private var imageViews: [UIImageView] = []
+    private var cardViews: [UIView] = []
     private weak var activeOverlay: PhotoStackOverlayView?
     
     // Track cumulative rotation across pinch + rotation gestures
@@ -254,8 +267,8 @@ final class PhotoStackView: UIView {
     func update(photos: [DummyPhoto]) {
         guard photos.map(\.id) != self.photos.map(\.id) else { return }
         self.photos = photos
-        imageViews.forEach { $0.removeFromSuperview() }
-        imageViews.removeAll()
+        cardViews.forEach { $0.removeFromSuperview() }
+        cardViews.removeAll()
         buildStack()
     }
 
@@ -266,35 +279,55 @@ final class PhotoStackView: UIView {
         let count     = min(photos.count, offsets.count + 1)
 
         for i in (0..<count).reversed() {
-            let iv  = makeImageView(for: photos[i])
+            let card = makeCard(for: photos[i])
             let rot = i < rotations.count ? rotations[i] : 0
             let off = i < offsets.count   ? offsets[i]   : .zero
-            iv.transform = CGAffineTransform(rotationAngle: rot * .pi / 180)
-            iv.center    = CGPoint(x: bounds.midX + off.x, y: bounds.midY + off.y)
-            addSubview(iv)
-            imageViews.append(iv)
+            card.transform = CGAffineTransform(rotationAngle: rot * .pi / 180)
+            card.center    = CGPoint(x: bounds.midX + off.x, y: bounds.midY + off.y)
+            addSubview(card)
+            cardViews.append(card)
         }
     }
 
-    private func makeImageView(for photo: DummyPhoto) -> UIImageView {
-        let iv = UIImageView(frame: CGRect(x: 0, y: 0, width: 120, height: 120))
+    private func makeCard(for photo: DummyPhoto) -> UIView {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 120, height: 120))
+        container.layer.cornerRadius  = 8
+        container.layer.cornerCurve   = .continuous
+        container.layer.masksToBounds = false
+        
+        container.layer.shadowColor = UIColor.black.cgColor
+        container.layer.shadowOpacity = 0.12
+        container.layer.shadowOffset = CGSize(width: 0, height: 4)
+        container.layer.shadowRadius = 8
+
+        let iv = UIImageView(frame: container.bounds)
+        iv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         iv.contentMode     = .scaleAspectFill
         iv.clipsToBounds   = true
         iv.backgroundColor = UIColor(photo.color)
         iv.layer.cornerRadius = 8
         iv.layer.cornerCurve  = .continuous
+        
+        iv.layer.borderWidth = 3
+        iv.layer.borderColor = UIColor.white.cgColor
+        
+        container.addSubview(iv)
 
         if let localId = photo.localIdentifier {
-            let result = PHAsset.fetchAssets(withLocalIdentifiers: [localId], options: nil)
-            if let asset = result.firstObject {
-                ImageCache.shared.requestImage(
-                    for: asset, targetSize: CGSize(width: 256, height: 256)
-                ) { [weak iv] img in
-                    DispatchQueue.main.async { iv?.image = img }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let result = PHAsset.fetchAssets(withLocalIdentifiers: [localId], options: nil)
+                if let asset = result.firstObject {
+                    Task { @MainActor in
+                        ImageCache.shared.requestImage(
+                            for: asset, targetSize: CGSize(width: 256, height: 256)
+                        ) { [weak iv] img in
+                            DispatchQueue.main.async { iv?.image = img }
+                        }
+                    }
                 }
             }
         }
-        return iv
+        return container
     }
 
     // MARK: Gestures
@@ -340,7 +373,7 @@ final class PhotoStackView: UIView {
             currentPinchProgress = 0
 
             // Hide grid cards — overlay will show identical cards on top
-            imageViews.forEach { $0.alpha = 0 }
+            cardViews.forEach { $0.alpha = 0 }
 
             let overlay = PhotoStackOverlayView(
                 photos: Array(photos.prefix(6)),
@@ -353,7 +386,7 @@ final class PhotoStackView: UIView {
             // Called after spring ends, while overlay still covers the grid —
             // grid cards restore to alpha=1 invisibly, then overlay fades out over them.
             overlay.onRestoreGridCards = { [weak self] in
-                self?.imageViews.forEach { $0.alpha = 1 }
+                self?.cardViews.forEach { $0.alpha = 1 }
             }
             overlay.frame = window.bounds
             window.addSubview(overlay)

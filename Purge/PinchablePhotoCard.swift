@@ -356,13 +356,13 @@ private struct PhotoLoaderView: View {
     let localIdentifier: String
     let targetSize: CGSize
     
-    @State private var imageData: Data?
+    @State private var uiImage: UIImage?
     @State private var isLoading = false
     
     var body: some View {
         Group {
-            if let data = imageData, let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
+            if let image = uiImage {
+                Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
             } else {
@@ -408,7 +408,7 @@ private struct PhotoLoaderView: View {
         }
         
         for await image in stream {
-            self.imageData = image.jpegData(compressionQuality: 0.9)
+            self.uiImage = image
             self.isLoading = false
         }
     }
