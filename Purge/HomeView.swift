@@ -148,11 +148,13 @@ struct HomeView: View {
     }
     
     private func photoStackItem(group: DayGroup) -> some View {
-        let stack = PinchablePhotoStack(photos: group.photos, seed: group.id.hashValue) {}
-            .frame(width: 120, height: 120)
+        let stack = PinchablePhotoStack(photos: group.photos, seed: group.id.hashValue) {
+            // TODO: Navigate to group detail
+        }
+        .frame(width: 160, height: 160)
         
         return stack
-            .cornerRadius(12)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
     }
     

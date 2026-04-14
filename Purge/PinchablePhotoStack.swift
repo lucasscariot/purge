@@ -9,7 +9,6 @@ final class PhotoStackOverlayView: UIView {
     var onDismiss: (() -> Void)?
     var onRestoreGridCards: (() -> Void)?
 
-    private let dimView = UIView()
     private var cardViews: [UIView] = []
 
     // Precomputed per-card configs
@@ -44,9 +43,10 @@ final class PhotoStackOverlayView: UIView {
         CGPoint(x: 0.75, y: 0.65),  // lower-right
         CGPoint(x: 0.50, y: 0.80),  // bottom-centre
     ]
-    private let spreadScale: CGFloat = 1.25  // cards grow 25 % at full spread
+    private let spreadScale: CGFloat = 1.08  // cards grow 8% at full spread
 
     private let cardSize = CGSize(width: 120, height: 120)
+    private let cardCornerRadius: CGFloat = 8
 
     init(photos: [DummyPhoto], sourceFrame: CGRect, windowBounds: CGRect, seed: Int,
          onDismiss: @escaping () -> Void) {
@@ -98,21 +98,12 @@ final class PhotoStackOverlayView: UIView {
             )
         }
 
-        setupDim()
         setupCards(photos: photos, count: count)
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
     // MARK: Setup
-
-    private func setupDim() {
-        dimView.backgroundColor = .black
-        dimView.alpha = 0
-        dimView.frame = bounds
-        dimView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        addSubview(dimView)
-    }
 
     private func setupCards(photos: [DummyPhoto], count: Int) {
         // Back cards added first so the front card sits on top
@@ -128,7 +119,7 @@ final class PhotoStackOverlayView: UIView {
 
     private func makeCard(photo: DummyPhoto) -> UIView {
         let container = UIView(frame: CGRect(origin: .zero, size: cardSize))
-        container.layer.cornerRadius  = 10
+        container.layer.cornerRadius  = cardCornerRadius
         container.layer.cornerCurve   = .continuous
         container.layer.masksToBounds = false
 
@@ -136,7 +127,7 @@ final class PhotoStackOverlayView: UIView {
         iv.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         iv.contentMode  = .scaleAspectFill
         iv.clipsToBounds = true
-        iv.layer.cornerRadius = 10
+        iv.layer.cornerRadius = cardCornerRadius
         iv.layer.cornerCurve  = .continuous
         iv.backgroundColor    = UIColor(photo.color)
         container.addSubview(iv)
@@ -161,14 +152,18 @@ final class PhotoStackOverlayView: UIView {
     }
 
     func updateProgressWithRotation(_ t: CGFloat, rotation: CGFloat) {
+        // Inflate/deflate scale based on pinch progress (unbounded)
+        let inflateScale = 1.0 + (max(0, t) * 0.08)
+        
         for (i, card) in cardViews.enumerated() {
             card.center    = lerp(stackCenters[i],    spreadCenters[i],    t)
             let baseTransform = lerpAffine(stackTransforms[i], spreadTransforms[i], t)
             let rotationTransform = CGAffineTransform(rotationAngle: rotation)
-            card.transform = rotationTransform.concatenating(baseTransform)
-            card.alpha     = stackAlphas[i] + (1 - stackAlphas[i]) * t
+            let scaleTransform = CGAffineTransform(scaleX: inflateScale, y: inflateScale)
+            card.transform = rotationTransform.concatenating(scaleTransform).concatenating(baseTransform)
+            let clampedAlpha = min(1.0, stackAlphas[i] + (1 - stackAlphas[i]) * t)
+            card.alpha     = clampedAlpha
         }
-        dimView.alpha = t * 0.45
     }
 
     // MARK: Spring back and remove
@@ -176,25 +171,23 @@ final class PhotoStackOverlayView: UIView {
     func springClose(releaseVelocity: CGFloat = 0, finalRotation: CGFloat = 0) {
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
 
-        // UIView.animate with .beginFromCurrentState reads the presentation layer for
-        // every property — including dimView.alpha and layer.shadowOpacity — so there
-        // is no single-frame snap regardless of what updateProgress set on the model.
+        // Restore grid cards immediately while overlay still covers them
+        onRestoreGridCards?()
+
+        // Animate cards to original stack positions (no overshoot)
         UIView.animate(
-            withDuration: 0.52,
+            withDuration: 0.4,
             delay: 0,
-            usingSpringWithDamping: 0.72,
-            initialSpringVelocity: 0,
-            options: [.beginFromCurrentState, .allowUserInteraction]
+            usingSpringWithDamping: 1.0,
+            initialSpringVelocity: 0.5,
+            options: [.allowUserInteraction]
         ) {
             for (i, card) in self.cardViews.enumerated() {
                 card.center    = self.stackCenters[i]
-                let rotationTransform = CGAffineTransform(rotationAngle: -finalRotation)
-                card.transform = rotationTransform.concatenating(self.stackTransforms[i])
+                card.transform = self.stackTransforms[i]
                 card.alpha     = self.stackAlphas[i]
             }
-            self.dimView.alpha = 0
         } completion: { _ in
-            self.onRestoreGridCards?()
             self.removeFromSuperview()
             self.onDismiss?()
         }
@@ -284,7 +277,7 @@ final class PhotoStackView: UIView {
     private func makeImageView(for photo: DummyPhoto) -> UIImageView {
         let iv = UIImageView(frame: CGRect(x: 0, y: 0, width: 120, height: 120))
         iv.contentMode     = .scaleAspectFill
-        iv.clipsToBounds   = true   // masksToBounds stays true — image clips to corners
+        iv.clipsToBounds   = true
         iv.backgroundColor = UIColor(photo.color)
         iv.layer.cornerRadius = 8
         iv.layer.cornerCurve  = .continuous
@@ -365,7 +358,7 @@ final class PhotoStackView: UIView {
             activeOverlay = overlay
 
         case .changed:
-            let progress = max(0, min(1, (g.scale - 1.0) / 1.2))
+            let progress = (g.scale - 1.0) / 2.0
             currentPinchProgress = progress
             activeOverlay?.updateProgressWithRotation(progress, rotation: currentRotation)
 
