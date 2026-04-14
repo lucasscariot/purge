@@ -286,19 +286,19 @@ enum ClusteringEngine {
     }
 
     // Cached date formatters to prevent slow repeated allocations
-    nonisolated(unsafe) private static let eventMultiDayFormatter: DateFormatter = {
+    nonisolated private static let eventMultiDayFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "MMM yyyy"; return f
     }()
     
-    nonisolated(unsafe) private static let eventSingleDayFormatter: DateFormatter = {
+    nonisolated private static let eventSingleDayFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "EEE d MMM"; return f
     }()
     
-    nonisolated(unsafe) private static let dateRangeFormatter: DateFormatter = {
+    nonisolated private static let dateRangeFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "d MMM"; return f
     }()
     
-    nonisolated(unsafe) private static let shortDateFormatter: DateFormatter = {
+    nonisolated private static let shortDateFormatter: DateFormatter = {
         let f = DateFormatter(); f.dateFormat = "d MMM yyyy"; return f
     }()
 
