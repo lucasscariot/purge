@@ -139,7 +139,7 @@ struct HomeView: View {
                                 months: groupedPreviousDays.map { $0.id },
                                 proxy: proxy
                             )
-                            .frame(maxHeight: contentHeight > 0 ? max(0, contentHeight - topSafeArea - 24) : .infinity)
+                            .frame(maxHeight: contentHeight > 0 ? min(max(0, contentHeight - topSafeArea - 24), screenHeight - topSafeArea - 120) : .infinity)
                             .padding(.trailing, 0)
                             .padding(.top, topSafeArea + 24)
                         }
@@ -155,6 +155,12 @@ struct HomeView: View {
         let scenes = UIApplication.shared.connectedScenes
         let windowScene = scenes.first as? UIWindowScene
         return windowScene?.windows.first?.safeAreaInsets.top ?? 44
+    }
+    
+    private var screenHeight: CGFloat {
+        let scenes = UIApplication.shared.connectedScenes
+        let windowScene = scenes.first as? UIWindowScene
+        return windowScene?.windows.first?.bounds.height ?? UIScreen.main.bounds.height
     }
     
     // MARK: - Hero
