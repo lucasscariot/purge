@@ -30,12 +30,13 @@ struct HomeView: View {
         scanEngine.photoCount
     }
 
-    @State private var scrollOffset: CGFloat = 0
+    
     
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                DotGridBackground(scanProgress: scanProgress, scrollOffset: scrollOffset)
+                PurgeColor.background
+                    .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 48) {
@@ -242,84 +243,6 @@ struct HomeView: View {
         formatter.allowedUnits = [.useAll]
         formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
-    }
-}
-
-// MARK: - Dot Grid Background
-
-struct DotGridBackground: View {
-    let scanProgress: Double?
-    let scrollOffset: CGFloat
-    
-    @State private var phase: CGFloat = 0
-    @State private var touchBounce: CGFloat = 0
-    
-    var body: some View {
-        Canvas { context, size in
-            let spacing: CGFloat = 28
-            let baseDotSize: CGFloat = 3.5
-            
-            context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(PurgeColor.background))
-            
-            let progress = scanProgress ?? 0
-            let isScanning = progress > 0 && progress < 1
-            let bounce = touchBounce * 8
-            
-            var x: CGFloat = spacing / 2
-            while x < size.width {
-                var y: CGFloat = spacing / 2
-                while y < size.height {
-                    let waveOffset = sin((x + y) / 50 + phase) * 0.5 + 0.5
-                    let colorIntensity = Color(hex: "E5E3E0")
-                    
-                    let dotSize: CGFloat
-                    let dotColor: Color
-                    
-                    if isScanning {
-                        let animatedWave = waveOffset * CGFloat(progress)
-                        dotSize = baseDotSize + animatedWave * 4
-                        
-                        let saturation = animatedWave * 0.3
-                        dotColor = Color(
-                            red: 0.898 + saturation * 0.102,
-                            green: 0.890 - saturation * 0.047,
-                            blue: 0.878 - saturation * 0.125,
-                            opacity: 0.6 + animatedWave * 0.4
-                        )
-                    } else {
-                        let touchOffset = sin((x + y) / 30 + scrollOffset / 2) * 0.5 + 0.5
-                        let bounceScale = touchBounce > 0 ? touchOffset * bounce : 0
-                        dotSize = baseDotSize + CGFloat(waveOffset) * 0.8 + bounceScale
-                        dotColor = touchBounce > 0 
-                            ? Color(hex: "E5E3E0").opacity(0.5 + touchOffset * 0.5 + touchOffset * 0.3)
-                            : colorIntensity.opacity(0.5 + waveOffset * 0.5)
-                    }
-                    
-                    let rect = CGRect(x: x - dotSize/2, y: y - dotSize/2, width: dotSize, height: dotSize)
-                    context.fill(Path(ellipseIn: rect), with: .color(dotColor))
-                    y += spacing
-                }
-                x += spacing
-            }
-        }
-        .ignoresSafeArea()
-        .onAppear {
-            withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
-                phase = .pi * 2
-            }
-        }
-        .onChange(of: scrollOffset) { oldValue, newValue in
-            if abs(newValue - oldValue) > 1 {
-                withAnimation(.spring(response: 0.15, dampingFraction: 0.6)) {
-                    touchBounce = 1
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    withAnimation(.easeOut(duration: 0.2)) {
-                        touchBounce = 0
-                    }
-                }
-            }
-        }
     }
 }
 
