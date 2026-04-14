@@ -1,4 +1,5 @@
 import SwiftUI
+import Pow
 
 struct SessionCompleteView: View {
     let keptCount: Int
@@ -96,6 +97,7 @@ struct SessionCompleteView: View {
         .overlay(alignment: .bottom) {
             Rectangle().fill(.white.opacity(0.12)).frame(height: 1)
         }
+        .transition(.movingParts.pop)
     }
 
     // MARK: - Actions

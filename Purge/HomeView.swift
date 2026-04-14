@@ -143,7 +143,7 @@ struct HomeView: View {
     
     private var rescanButton: some View {
         Button(action: {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
             onRescan()
         }) {
             Image(systemName: "arrow.trianglehead.clockwise")
@@ -155,19 +155,16 @@ struct HomeView: View {
                 .shadow(color: PurgeColor.text.opacity(0.2), radius: 16, x: 0, y: 8)
         }
         .buttonStyle(ScrapbookButtonStyle())
-        .scaleEffect(isRescanPressed ? 0.9 : 1.0)
-        .changeEffect(.jump(height: 6), value: isRescanPressed, isEnabled: true)
+        .scaleEffect(isRescanPressed ? 0.92 : 1.0)
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isRescanPressed)
         .disabled(scanProgress != nil)
         .opacity(scanProgress != nil ? 0.5 : 1.0)
+        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isRescanPressed)
         .onChange(of: scanProgress) { _, newValue in
-            if newValue != nil {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                    isRescanPressed = true
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
-                        isRescanPressed = false
-                    }
+            if newValue != nil && !isRescanPressed {
+                isRescanPressed = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                    isRescanPressed = false
                 }
             }
         }
