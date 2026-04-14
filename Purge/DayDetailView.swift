@@ -165,7 +165,7 @@ struct DayDetailView: View {
     var body: some View {
         if let day {
             ZStack(alignment: .top) {
-                DotGridBackground()
+                DotGridBackground(scanProgress: nil)
 
                 ScrollView {
                     VStack(spacing: 32) {

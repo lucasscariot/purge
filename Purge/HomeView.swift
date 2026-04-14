@@ -34,7 +34,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                DotGridBackground()
+                DotGridBackground(scanProgress: scanProgress)
                 
                 ScrollView {
                     VStack(spacing: 48) {
@@ -352,18 +352,46 @@ private final class SendableBox: @unchecked Sendable {
 // MARK: - Dot Grid Background
 
 struct DotGridBackground: View {
+    let scanProgress: Double?
+    
+    @State private var phase: CGFloat = 0
+    
     var body: some View {
         Canvas { context, size in
             let spacing: CGFloat = 28
-            let dotSize: CGFloat = 3.5
-            let dotColor = Color(hex: "E5E3E0")
+            let baseDotSize: CGFloat = 3.5
             
             context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(PurgeColor.background))
+            
+            let progress = scanProgress ?? 0
+            let isScanning = progress > 0 && progress < 1
             
             var x: CGFloat = spacing / 2
             while x < size.width {
                 var y: CGFloat = spacing / 2
                 while y < size.height {
+                    let waveOffset = sin((x + y) / 50 + phase) * 0.5 + 0.5
+                    let colorIntensity = Color(hex: "E5E3E0")
+                    
+                    let dotSize: CGFloat
+                    let dotColor: Color
+                    
+                    if isScanning {
+                        let animatedWave = waveOffset * CGFloat(progress)
+                        dotSize = baseDotSize + animatedWave * 4
+                        
+                        let saturation = animatedWave * 0.3
+                        dotColor = Color(
+                            red: 0.898 + saturation * 0.102,
+                            green: 0.890 - saturation * 0.047,
+                            blue: 0.878 - saturation * 0.125,
+                            opacity: 0.6 + animatedWave * 0.4
+                        )
+                    } else {
+                        dotSize = baseDotSize + CGFloat(waveOffset) * 0.8
+                        dotColor = colorIntensity.opacity(0.5 + waveOffset * 0.5)
+                    }
+                    
                     let rect = CGRect(x: x - dotSize/2, y: y - dotSize/2, width: dotSize, height: dotSize)
                     context.fill(Path(ellipseIn: rect), with: .color(dotColor))
                     y += spacing
@@ -372,6 +400,11 @@ struct DotGridBackground: View {
             }
         }
         .ignoresSafeArea()
+        .onAppear {
+            withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
+                phase = .pi * 2
+            }
+        }
     }
 }
 
