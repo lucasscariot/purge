@@ -97,13 +97,16 @@ struct PinchablePhotoCard: View {
         currentScale = 1.0
         currentRotation = .zero
         
+        isZooming = true
+        onZoomChanged?(true)
+        withAnimation(.easeInOut(duration: 0.2)) {
+            backgroundOpacity = 0.5
+        }
+        
         Task {
-            zoomImage = await loadHighQualityImage()
-            await MainActor.run {
-                isZooming = true
-                onZoomChanged?(true)
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    backgroundOpacity = 0.5
+            for await image in loadImagesOpportunistically(targetSize: CGSize(width: 1200, height: 1200), contentMode: .aspectFit) {
+                await MainActor.run {
+                    self.zoomImage = image
                 }
             }
         }
@@ -152,21 +155,32 @@ struct PinchablePhotoCard: View {
         }
     }
     
-    private func loadHighQualityImage() async -> UIImage? {
-        guard !localIdentifier.isEmpty else { return nil }
-        
-        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil).firstObject else { return nil }
-        
-        let cachingManager = PHCachingImageManager()
-        let options = PHImageRequestOptions()
-        options.isNetworkAccessAllowed = true
-        options.deliveryMode = .highQualityFormat
-        
-        let targetSize = CGSize(width: 1200, height: 1200)
-        
-        return await withCheckedContinuation { continuation in
-            cachingManager.requestImage(for: asset, targetSize: targetSize, contentMode: .aspectFit, options: options) { img, _ in
-                continuation.resume(returning: img)
+    private func loadImagesOpportunistically(targetSize: CGSize, contentMode: PHImageContentMode) -> AsyncStream<UIImage> {
+        AsyncStream { continuation in
+            guard !localIdentifier.isEmpty else {
+                continuation.finish()
+                return
+            }
+            
+            guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil).firstObject else {
+                continuation.finish()
+                return
+            }
+            
+            let cachingManager = PHCachingImageManager()
+            let options = PHImageRequestOptions()
+            options.isNetworkAccessAllowed = true
+            options.deliveryMode = .opportunistic
+            
+            cachingManager.requestImage(for: asset, targetSize: targetSize, contentMode: contentMode, options: options) { img, info in
+                if let image = img {
+                    continuation.yield(image)
+                }
+                
+                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                if !isDegraded {
+                    continuation.finish()
+                }
             }
         }
     }
@@ -369,23 +383,33 @@ private struct PhotoLoaderView: View {
     private func loadImage() async {
         guard !localIdentifier.isEmpty else { return }
         isLoading = true
-        defer { isLoading = false }
         
-        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil).firstObject else { return }
+        guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil).firstObject else {
+            isLoading = false
+            return
+        }
         
         let cachingManager = PHCachingImageManager()
         let options = PHImageRequestOptions()
         options.isNetworkAccessAllowed = true
-        options.deliveryMode = .highQualityFormat
+        options.deliveryMode = .opportunistic
         
-        let image: UIImage? = await withCheckedContinuation { continuation in
-            cachingManager.requestImage(for: asset, targetSize: targetSize, contentMode: .aspectFill, options: options) { img, _ in
-                continuation.resume(returning: img)
+        let stream = AsyncStream<UIImage> { continuation in
+            cachingManager.requestImage(for: asset, targetSize: targetSize, contentMode: .aspectFill, options: options) { img, info in
+                if let image = img {
+                    continuation.yield(image)
+                }
+                
+                let isDegraded = (info?[PHImageResultIsDegradedKey] as? Bool) ?? false
+                if !isDegraded {
+                    continuation.finish()
+                }
             }
         }
         
-        if let image = image {
-            imageData = image.jpegData(compressionQuality: 0.9)
+        for await image in stream {
+            self.imageData = image.jpegData(compressionQuality: 0.9)
+            self.isLoading = false
         }
     }
 }
