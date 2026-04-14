@@ -144,7 +144,7 @@ struct DayDetailOverlay: View {
                                         .font(.system(size: 14, weight: .semibold))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
-                                        .background(RoundedRectangle(cornerRadius: 16).fill(isAllSelected ? Color.blue.opacity(0.8) : .white.opacity(0.2)))
+                                        .background(RoundedRectangle(cornerRadius: 16).fill(isAllSelected ? Color.red.opacity(0.8) : .white.opacity(0.2)))
                                         .foregroundStyle(.white)
                                 }
                                 
@@ -182,10 +182,10 @@ struct DayDetailOverlay: View {
                                                 let selected = isGroupSelected(group.photos)
                                                 Text(selected ? "Unselect Group" : "Select Group")
                                                     .font(.system(size: 13, weight: .semibold))
-                                                    .foregroundStyle(selected ? .white : .blue)
+                                                    .foregroundStyle(selected ? .white : .red)
                                                     .padding(.horizontal, 10)
                                                     .padding(.vertical, 4)
-                                                    .background(RoundedRectangle(cornerRadius: 12).fill(selected ? Color.blue.opacity(0.8) : Color.blue.opacity(0.15)))
+                                                    .background(RoundedRectangle(cornerRadius: 12).fill(selected ? Color.red.opacity(0.8) : Color.red.opacity(0.15)))
                                             }
                                         }
                                         .padding(.horizontal, 16)
@@ -269,13 +269,13 @@ struct DayDetailOverlay: View {
             .clipShape(RoundedRectangle(cornerRadius: 12))
             
             RoundedRectangle(cornerRadius: 12)
-                .stroke(isSelected ? Color.blue : Color.clear, lineWidth: 3)
+                .stroke(isSelected ? Color.red : Color.clear, lineWidth: 3)
                 .overlay {
                     if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
+                        Image(systemName: "trash.circle.fill")
                             .font(.system(size: 28))
                             .foregroundStyle(.white)
-                            .background(Circle().fill(Color.blue))
+                            .background(Circle().fill(Color.red))
                     }
                 }
         }
