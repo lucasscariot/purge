@@ -16,23 +16,14 @@ struct StaggeredGrid<Content: View, T: Identifiable>: View where T: Hashable {
     }
 
     var body: some View {
-        let rowCount = (data.count + columns - 1) / columns
-        let totalHeight = CGFloat(rowCount) * itemSize.height + CGFloat(max(0, rowCount - 1)) * spacing
-        let totalWidth = CGFloat(columns) * itemSize.width + CGFloat(max(0, columns - 1)) * spacing
+        let gridItems = Array(repeating: GridItem(.fixed(itemSize.width), spacing: spacing), count: columns)
 
-        ZStack(alignment: .topLeading) {
-            ForEach(Array(data.enumerated()), id: \.element.id) { index, item in
-                let col = index % columns
-                let row = index / columns
-                
-                let x = CGFloat(col) * (itemSize.width + spacing)
-                let y = CGFloat(row) * (itemSize.height + spacing)
-                
+        LazyVGrid(columns: gridItems, spacing: spacing) {
+            ForEach(data, id: \.id) { item in
                 content(item)
                     .frame(width: itemSize.width, height: itemSize.height)
-                    .position(x: x + itemSize.width / 2, y: y + itemSize.height / 2)
             }
         }
-        .frame(width: totalWidth, height: totalHeight)
+        .frame(maxWidth: .infinity)
     }
 }

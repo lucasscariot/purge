@@ -68,9 +68,6 @@ struct SwipeCardView: View {
                 Spacer()
                 bottomBar
             }
-
-            // Border
-            Rectangle().strokeBorder(PurgeColor.border, lineWidth: 1)
         }
         .frame(width: 320, height: 440)
         .rotationEffect(.degrees(rotation))

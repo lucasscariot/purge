@@ -16,7 +16,7 @@ final class AssetRecord {
     var isLocallyAvailable: Bool
 
     // Vision results
-    var featureVectorData: Data?
+    @Attribute(.externalStorage) var featureVectorData: Data?
     var blurScore: Float        // -1 = not computed, higher = sharper
     var isBlurry: Bool
 

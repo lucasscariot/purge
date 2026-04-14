@@ -67,7 +67,6 @@ private struct NaturalPinchableTile: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
-            .overlay(RoundedRectangle(cornerRadius: cornerRadius).strokeBorder(.white, lineWidth: 4))
             .stickerShadow()
             .rotationEffect(.degrees(rotation))
             .scaleEffect(currentScale, anchor: .center)
@@ -170,8 +169,6 @@ struct DayDetailView: View {
 
                 ScrollView {
                     VStack(spacing: 32) {
-                        customHeader
-
                         if !day.nearDuplicateSets.isEmpty {
                             quickActionBar
                         }
@@ -204,55 +201,6 @@ struct DayDetailView: View {
         } else {
             ZStack { Color.black }
         }
-    }
-
-    // MARK: - Custom Header
-
-    private var customHeader: some View {
-        HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 4) {
-                if let loc = locationDisplayString {
-                    Text(loc.uppercased())
-                        .font(PurgeFont.mono(16, weight: .bold))
-                        .foregroundStyle(PurgeColor.text)
-                        .lineLimit(1)
-                    Text(dateLabel)
-                        .font(PurgeFont.mono(12, weight: .semibold))
-                        .foregroundStyle(PurgeColor.textMuted)
-                } else {
-                    Text(dateLabel)
-                        .font(PurgeFont.mono(16, weight: .bold))
-                        .foregroundStyle(PurgeColor.text)
-                        .lineLimit(1)
-                }
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(PurgeColor.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.white, lineWidth: 3))
-            .stickerShadow()
-            .rotationEffect(.degrees(-2))
-
-            Spacer()
-
-            HStack(spacing: 4) {
-                Image(systemName: "photo.stack.fill")
-                    .font(.system(size: 12))
-                    .foregroundStyle(PurgeColor.text)
-                Text("\(day?.photoCount ?? 0)")
-                    .font(PurgeFont.mono(14, weight: .bold))
-                    .foregroundStyle(PurgeColor.text)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(PurgeColor.surface)
-            .clipShape(Capsule())
-            .overlay(Capsule().strokeBorder(Color.white, lineWidth: 2))
-            .stickerShadow()
-            .rotationEffect(.degrees(3))
-        }
-        .padding(.horizontal, 16)
     }
 
     // MARK: - Quick Action Bar
@@ -328,23 +276,30 @@ struct DayDetailView: View {
         let clusterPhotos = (day?.photos ?? []).filter { (photo: DummyPhoto) in
             group.contains(photo.localIdentifier ?? "")
         }
-        return VStack(alignment: .center, spacing: 12) {
-            HStack(spacing: 8) {
-                Text("GROUP \(index + 1)")
-                    .font(PurgeFont.mono(11, weight: .bold))
-                    .foregroundStyle(PurgeColor.text)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(color)
-                    .clipShape(Capsule())
-                    .overlay(Capsule().strokeBorder(Color.white, lineWidth: 2))
-                    .stickerShadow()
-                    .rotationEffect(.degrees(-1))
-
-                Text("— \(group.count) photos")
-                    .font(PurgeFont.mono(12))
-                    .foregroundStyle(PurgeColor.textMuted)
+        return VStack(alignment: .center, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Group \(index + 1)")
+                        .font(PurgeFont.display(20, weight: .bold))
+                        .foregroundStyle(PurgeColor.text)
+                    
+                    Text("\(group.count) similar photos")
+                        .font(PurgeFont.ui(14, weight: .medium))
+                        .foregroundStyle(PurgeColor.textMuted)
+                }
+                Spacer()
+                
+                Image(systemName: "photo.on.rectangle.angled")
+                    .font(.system(size: 24))
+                    .foregroundStyle(color)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(PurgeColor.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.white, lineWidth: 3))
+            .stickerShadow()
+            .rotationEffect(.degrees(Double(index % 2 == 0 ? -1 : 1)))
             .padding(.horizontal, 16)
 
             StaggeredGrid(clusterPhotos, columns: 2, spacing: 16, itemSize: CGSize(width: 160, height: 200)) { photo in
@@ -374,23 +329,30 @@ struct DayDetailView: View {
     }
 
     private func singlesSection(singles: [DummyPhoto]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 8) {
-                Text("SINGLES")
-                    .font(PurgeFont.mono(11, weight: .bold))
-                    .foregroundStyle(PurgeColor.text)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
-                    .background(PurgeColor.surface)
-                    .clipShape(Capsule())
-                    .overlay(Capsule().strokeBorder(Color.white, lineWidth: 2))
-                    .stickerShadow()
-                    .rotationEffect(.degrees(1))
-
-                Text("— \(singles.count) photos")
-                    .font(PurgeFont.mono(12))
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Singles")
+                        .font(PurgeFont.display(20, weight: .bold))
+                        .foregroundStyle(PurgeColor.text)
+                    
+                    Text("\(singles.count) unique photos")
+                        .font(PurgeFont.ui(14, weight: .medium))
+                        .foregroundStyle(PurgeColor.textMuted)
+                }
+                Spacer()
+                
+                Image(systemName: "photo")
+                    .font(.system(size: 24))
                     .foregroundStyle(PurgeColor.textMuted)
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(PurgeColor.surface)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.white, lineWidth: 3))
+            .stickerShadow()
+            .rotationEffect(.degrees(1))
             .padding(.horizontal, 16)
 
             FlowLayout(spacing: 16) {

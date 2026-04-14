@@ -42,6 +42,10 @@ enum PurgeFont {
         .system(size: size, weight: weight, design: .serif)
     }
 
+    static func cursive(_ size: CGFloat) -> Font {
+        .custom("PlaywriteCU-Regular", size: size)
+    }
+
     /// UI labels, buttons, metadata — SF Pro Rounded
     static func ui(_ size: CGFloat, weight: Font.Weight = .medium) -> Font {
         .system(size: size, weight: weight, design: .rounded)
@@ -212,6 +216,7 @@ enum PurgeAnimation {
 // MARK: - Async Photo Image (shared component)
 
 /// Unified async photo loader using ImageCache for memory management and concurrency control
+@MainActor
 struct AsyncPhotoImage: View {
     let localIdentifier: String
     let placeholder: Color
@@ -245,14 +250,16 @@ struct AsyncPhotoImage: View {
             .firstObject
         else { return }
 
-        let finalImage: UIImage? = await withCheckedContinuation { continuation in
-            ImageCache.shared.requestImage(for: asset, targetSize: targetSize, ignoreDegraded: true) { image in
-                continuation.resume(returning: image)
+        self.image = await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                ImageCache.shared.requestImage(for: asset, targetSize: targetSize, ignoreDegraded: true) { image in
+                    continuation.resume(returning: image)
+                }
             }
-        }
-        
-        if let finalImage = finalImage {
-            self.image = finalImage
+        } onCancel: {
+            Task { @MainActor in
+                ImageCache.shared.cancelRequest(for: localIdentifier)
+            }
         }
     }
 }

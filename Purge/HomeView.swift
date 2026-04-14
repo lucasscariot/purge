@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 @preconcurrency import Photos
 
 // MARK: - HomeView
@@ -10,7 +11,13 @@ struct HomeView: View {
     var onRescan: () -> Void
 
     @Environment(ScanEngine.self) private var scanEngine
+    @Environment(\.modelContext) private var modelContext
     @State private var selectedDay: DayGroup?
+    @Query private var memorySavedRecords: [MemorySaved]
+    
+    private var totalMemorySaved: Int64 {
+        memorySavedRecords.first?.totalBytesSaved ?? 0
+    }
 
     private var dayGroups: [DayGroup] {
         scanEngine.dayGroups
@@ -50,7 +57,9 @@ struct HomeView: View {
                             ]
                             LazyVGrid(columns: columns, spacing: 24) {
                                 ForEach(dayGroups.sorted(by: { $0.date > $1.date })) { day in
-                                    DaySection(day: day, selectedDay: $selectedDay)
+                                    DaySection(day: day) { selected in
+                                        selectedDay = selected
+                                    }
                                 }
                             }
                             .padding(.horizontal, 24)
@@ -143,20 +152,18 @@ struct HomeView: View {
                         ForEach(pastDays.sorted(by: { Calendar.current.component(.year, from: $0.date) > Calendar.current.component(.year, from: $1.date) }), id: \.id) { group in
                             let year = Calendar.current.component(.year, from: group.date)
                             
-                            Button(action: {
-                                selectedDay = group
-                            }) {
-                                VStack(alignment: .center, spacing: 12) {
-                                    PhotoPileView(photos: group.photos, seed: group.id.hashValue)
-                                        .stickerShadow()
-                                        .rotationEffect(.degrees(Double((year * 7) % 11) - 5.0))
-                                    
-                                    Text(String(year))
-                                        .font(PurgeFont.mono(14, weight: .bold))
-                                        .foregroundStyle(PurgeColor.text)
+                            VStack(alignment: .center, spacing: 12) {
+                                PinchablePhotoStack(photos: group.photos, seed: group.id.hashValue) {
+                                    selectedDay = group
                                 }
+                                .frame(width: 140, height: 140)
+                                .stickerShadow()
+                                .rotationEffect(.degrees(Double((year * 7) % 11) - 5.0))
+                                
+                                Text(String(year))
+                                    .font(PurgeFont.mono(14, weight: .bold))
+                                    .foregroundStyle(PurgeColor.text)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 24)
@@ -169,15 +176,20 @@ struct HomeView: View {
     // MARK: - Hero
     
     private var heroSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Your Scrapbook")
-                .font(PurgeFont.display(42, weight: .bold))
-                .foregroundStyle(PurgeColor.text)
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Saved \(formatBytes(totalMemorySaved))")
+                    .font(PurgeFont.cursive(22))
+                    .foregroundStyle(PurgeColor.mustard)
             
-            Text("\(formatted(dynamicPhotoCount)) photos waiting to be organized")
-                .font(PurgeFont.ui(16, weight: .medium))
-                .foregroundStyle(PurgeColor.textMuted)
-        }
+                Text("Your Scrapbook")
+                    .font(PurgeFont.display(42, weight: .bold))
+                    .foregroundStyle(PurgeColor.text)
+            
+                Text("\(formatted(dynamicPhotoCount)) photos waiting to be organized")
+                    .font(PurgeFont.ui(16, weight: .medium))
+                    .foregroundStyle(PurgeColor.textMuted)
+            }
+
         .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -243,13 +255,20 @@ struct HomeView: View {
     private func formatted(_ n: Int) -> String {
         n >= 1000 ? "\(n / 1000),\(String(format: "%03d", n % 1000))" : "\(n)"
     }
+
+    private func formatBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useAll]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
+    }
 }
 
 // MARK: - Day Section
 
 struct DaySection: View {
     let day: DayGroup
-    @Binding var selectedDay: DayGroup?
+    let onSelect: (DayGroup) -> Void
     @State private var isPressed = false
     
     private var locationDisplayString: String? {
@@ -263,7 +282,7 @@ struct DaySection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             PinchablePhotoStack(photos: day.photos, seed: day.id.hashValue) {
-                selectedDay = day
+                onSelect(day)
             }
             .frame(width: 160, height: 160)
 
@@ -292,83 +311,6 @@ struct DaySection: View {
         let f = DateFormatter()
         f.dateFormat = "d MMMM"
         return f.string(from: date)
-    }
-}
-
-// MARK: - Photo Pile View
-
-struct PhotoPileView: View {
-    let photos: [DummyPhoto]
-    let seed: Int
-    
-    private struct PilePattern {
-        let offsets: [CGPoint]
-        let rotations: [Double]
-    }
-    
-    private let patterns: [PilePattern] = [
-        PilePattern(offsets: [CGPoint(x: -8, y: -4), CGPoint(x: 8, y: 4)], rotations: [-4, 3]),
-        PilePattern(offsets: [CGPoint(x: -6, y: -6), CGPoint(x: 0, y: 0), CGPoint(x: 6, y: 6)], rotations: [-5, 0, 4]),
-        PilePattern(offsets: [CGPoint(x: -8, y: -4), CGPoint(x: -4, y: 4), CGPoint(x: 4, y: -4), CGPoint(x: 8, y: 4)], rotations: [-6, -2, 2, 5])
-    ]
-    
-    var body: some View {
-        ZStack {
-            let patternIndex = abs(seed) % patterns.count
-            let pattern = patterns[patternIndex]
-            let displayPhotos = Array(photos.prefix(pattern.offsets.count + 1))
-            
-            ForEach(0..<displayPhotos.count, id: \.self) { i in
-                let index = displayPhotos.count - 1 - i
-                PilePhotoView(photo: displayPhotos[index])
-                    .rotationEffect(.degrees(index < pattern.rotations.count ? pattern.rotations[index] : 0))
-                    .offset(x: index < pattern.offsets.count ? pattern.offsets[index].x : 0, 
-                            y: index < pattern.offsets.count ? pattern.offsets[index].y : 0)
-            }
-        }
-        .aspectRatio(1, contentMode: .fit)
-        .frame(width: 140, height: 140)
-    }
-}
-
-struct PilePhotoView: View {
-    let photo: DummyPhoto
-    @State private var loadedImage: UIImage?
-    @State private var asset: PHAsset?
-    
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(photo.color)
-            
-            if let image = loadedImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            }
-        }
-        .frame(width: 120, height: 120)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(Color.white, lineWidth: 2)
-        )
-        .shadow(color: PurgeColor.text.opacity(0.1), radius: 2, x: 0, y: 1)
-        .task(id: photo.localIdentifier) {
-            guard let localId = photo.localIdentifier else { return }
-            let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [localId], options: nil)
-            self.asset = fetchResult.firstObject
-            if let asset = self.asset {
-                ImageCache.shared.requestImage(for: asset, targetSize: CGSize(width: 256, height: 256)) { image in
-                    self.loadedImage = image
-                }
-            }
-        }
-        .onDisappear {
-            if let asset = asset {
-                ImageCache.shared.cancelRequest(for: asset)
-            }
-        }
     }
 }
 

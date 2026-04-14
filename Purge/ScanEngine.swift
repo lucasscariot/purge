@@ -84,6 +84,14 @@ final class ScanEngine {
 
     /// Tracks whether a deletion is currently in progress.
     var isDeleting: Bool { pendingDeletion != nil }
+    
+    private func updateMemorySaved(bytes: Int64, context: ModelContext) {
+        Task {
+            let container = context.container
+            let persistence = PersistenceManager(modelContainer: container)
+            try? await persistence.updateMemorySaved(bytes: bytes)
+        }
+    }
 
     /// Phase 1: Deletes assets from the Photos library. Returns true if the user confirmed.
     /// Does NOT mutate in-memory state — call `cleanupAfterDeletion` separately.
@@ -130,10 +138,33 @@ final class ScanEngine {
         return success
     }
 
+    private func calculateBytesSaved(identifiers: Set<String>, context: ModelContext) -> Int64 {
+        var totalBytes: Int64 = 0
+        let idArray = Array(identifiers)
+        let chunkSize = 500
+        
+        for i in stride(from: 0, to: idArray.count, by: chunkSize) {
+            let chunk = Array(idArray[i..<min(i + chunkSize, idArray.count)])
+            let predicate = #Predicate<AssetRecord> { chunk.contains($0.localIdentifier) }
+            let desc = FetchDescriptor<AssetRecord>(predicate: predicate)
+            if let records = try? context.fetch(desc) {
+                for record in records {
+                    totalBytes += Int64(record.fileSize)
+                }
+            }
+        }
+        return totalBytes
+    }
+
     /// Phase 2: Update in-memory dayGroups and prune SwiftData after deletion.
     /// Call this AFTER the presenting view has dismissed to avoid navigation crashes.
     func cleanupAfterDeletion(identifiers: Set<String>, context: ModelContext) {
         print("[PURGE-TRASH] cleanupAfterDeletion START: \(identifiers.count) items, dayGroups before=\(dayGroups.count)")
+        
+        // Calculate bytes saved
+        let bytesSaved = calculateBytesSaved(identifiers: identifiers, context: context)
+        updateMemorySaved(bytes: bytesSaved, context: context)
+        
         dayGroups = dayGroups.compactMap { day in
             let remaining = day.photos.filter { !identifiers.contains($0.localIdentifier ?? "") }
             guard !remaining.isEmpty else { return nil }
@@ -222,10 +253,18 @@ final class ScanEngine {
         var deletedClusters = 0
         var updatedClusters = 0
         
-        if let records = try? context.fetch(FetchDescriptor<AssetRecord>()) {
-            for record in records where identifiers.contains(record.localIdentifier) {
-                context.delete(record)
-                deletedAssetRecords += 1
+        let idArray = Array(identifiers)
+        let chunkSize = 500
+        
+        for i in stride(from: 0, to: idArray.count, by: chunkSize) {
+            let chunk = Array(idArray[i..<min(i + chunkSize, idArray.count)])
+            let predicate = #Predicate<AssetRecord> { chunk.contains($0.localIdentifier) }
+            let desc = FetchDescriptor<AssetRecord>(predicate: predicate)
+            if let records = try? context.fetch(desc) {
+                for record in records {
+                    context.delete(record)
+                    deletedAssetRecords += 1
+                }
             }
         }
         if let clusters = try? context.fetch(FetchDescriptor<ClusterRecord>()) {
@@ -753,7 +792,11 @@ final class ScanEngine {
         return Int64(Double(bytes) * 0.4)
     }
 
+    private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "d MMM"; return f
+    }()
+
     private func shortDate(_ date: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "d MMM"; return f.string(from: date).uppercased()
+        return Self.shortDateFormatter.string(from: date).uppercased()
     }
 }

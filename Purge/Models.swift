@@ -1,4 +1,15 @@
 import SwiftUI
+import SwiftData
+import Photos
+
+@Model
+final class MemorySaved {
+    var totalBytesSaved: Int64
+    
+    init(totalBytesSaved: Int64 = 0) {
+        self.totalBytesSaved = totalBytesSaved
+    }
+}
 
 // MARK: - Core Types
 

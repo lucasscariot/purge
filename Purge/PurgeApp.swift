@@ -36,7 +36,7 @@ struct PurgeApp: App {
             ContentRootView()
                 .environment(scanEngine)
         }
-        .modelContainer(for: [AssetRecord.self, ClusterRecord.self])
+        .modelContainer(for: [AssetRecord.self, ClusterRecord.self, MemorySaved.self])
     }
 }
 

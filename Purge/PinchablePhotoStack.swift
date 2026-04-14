@@ -130,8 +130,6 @@ final class PhotoStackOverlayView: UIView {
         let container = UIView(frame: CGRect(origin: .zero, size: cardSize))
         container.layer.cornerRadius  = 10
         container.layer.cornerCurve   = .continuous
-        container.layer.borderColor   = UIColor.white.cgColor
-        container.layer.borderWidth   = 2.5
         container.layer.masksToBounds = false
 
         let iv = UIImageView(frame: container.bounds)
@@ -290,8 +288,6 @@ final class PhotoStackView: UIView {
         iv.backgroundColor = UIColor(photo.color)
         iv.layer.cornerRadius = 8
         iv.layer.cornerCurve  = .continuous
-        iv.layer.borderColor  = UIColor.white.cgColor
-        iv.layer.borderWidth  = 2
 
         if let localId = photo.localIdentifier {
             let result = PHAsset.fetchAssets(withLocalIdentifiers: [localId], options: nil)
@@ -387,7 +383,10 @@ final class PhotoStackView: UIView {
 extension PhotoStackView: UIGestureRecognizerDelegate {
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                          shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-        return true
+        if gestureRecognizer.view == self && otherGestureRecognizer.view == self {
+            return true
+        }
+        return false
     }
 }
 

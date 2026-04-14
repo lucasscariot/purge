@@ -11,10 +11,16 @@ final class ImageCache {
     private let imageCache = NSCache<NSString, UIImage>()
     
     private var requestIDs: [String: PHImageRequestID] = [:]
-    private let semaphore = DispatchSemaphore(value: 15)
 
     private init() {
         imageCache.countLimit = 150
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didReceiveMemoryWarningNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.imageCache.removeAllObjects()
+        }
     }
     
     func requestImage(for asset: PHAsset, targetSize: CGSize, completion: @escaping @Sendable (UIImage?) -> Void) {
@@ -32,15 +38,12 @@ final class ImageCache {
         
         if let existingID = requestIDs.removeValue(forKey: localIdentifier) {
             cachingImageManager.cancelImageRequest(existingID)
-            semaphore.signal()
         }
         
         let options = PHImageRequestOptions()
         options.isNetworkAccessAllowed = true
         options.deliveryMode = .opportunistic
         options.isSynchronous = false
-        
-        semaphore.wait()
         
         let requestID = cachingImageManager.requestImage(for: asset, targetSize: targetSize, contentMode: .aspectFill, options: options) { [weak self] image, info in
             guard let self = self else { return }
@@ -53,7 +56,6 @@ final class ImageCache {
                 if self.requestIDs[localIdentifier] == resultID {
                     self.requestIDs.removeValue(forKey: localIdentifier)
                 }
-                self.semaphore.signal()
             }
             
             if ignoreDegraded && isDegraded {
@@ -69,8 +71,6 @@ final class ImageCache {
         
         if requestID != PHInvalidImageRequestID {
             requestIDs[localIdentifier] = requestID
-        } else {
-            semaphore.signal()
         }
     }
     
@@ -81,7 +81,6 @@ final class ImageCache {
     func cancelRequest(for localIdentifier: String) {
         if let requestID = requestIDs.removeValue(forKey: localIdentifier) {
             cachingImageManager.cancelImageRequest(requestID)
-            semaphore.signal()
         }
     }
 

@@ -285,32 +285,43 @@ enum ClusteringEngine {
         return shortDate(date)
     }
 
+    // Cached date formatters to prevent slow repeated allocations
+    nonisolated(unsafe) private static let eventMultiDayFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "MMM yyyy"; return f
+    }()
+    
+    nonisolated(unsafe) private static let eventSingleDayFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEE d MMM"; return f
+    }()
+    
+    nonisolated(unsafe) private static let dateRangeFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "d MMM"; return f
+    }()
+    
+    nonisolated(unsafe) private static let shortDateFormatter: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "d MMM yyyy"; return f
+    }()
+
     nonisolated private static func eventLabel(dates: [Date]) -> String {
         guard let first = dates.first else { return "UNTITLED_EVENT" }
         let cal = Calendar.current
         if let last = dates.last, !cal.isDate(first, inSameDayAs: last) {
-            // Multi-day: "NOV 2024"
-            let f = DateFormatter(); f.dateFormat = "MMM yyyy"
-            return f.string(from: first).uppercased()
+            return eventMultiDayFormatter.string(from: first).uppercased()
         }
-        // Single day: "SAT 12 NOV"
-        let f = DateFormatter(); f.dateFormat = "EEE d MMM"
-        return f.string(from: first).uppercased()
+        return eventSingleDayFormatter.string(from: first).uppercased()
     }
 
     nonisolated private static func dateRangeLabel(_ dates: [Date]) -> String {
         guard let first = dates.first, let last = dates.last else { return "" }
-        let f = DateFormatter(); f.dateFormat = "d MMM"
         let cal = Calendar.current
         if cal.isDate(first, inSameDayAs: last) {
-            return f.string(from: first).uppercased()
+            return dateRangeFormatter.string(from: first).uppercased()
         }
-        return "\(f.string(from: first).uppercased()) – \(f.string(from: last).uppercased())"
+        return "\(dateRangeFormatter.string(from: first).uppercased()) – \(dateRangeFormatter.string(from: last).uppercased())"
     }
 
     nonisolated private static func shortDate(_ date: Date) -> String {
-        let f = DateFormatter(); f.dateFormat = "d MMM yyyy"
-        return f.string(from: date).uppercased()
+        return shortDateFormatter.string(from: date).uppercased()
     }
 
     nonisolated static func bytesLabel(_ bytes: Int64) -> String {

@@ -1,12 +1,22 @@
 import Foundation
 import SwiftData
 
-// Assuming Models are in a module or file accessible to this target
-// If they are in a different module, we'd need to import that module.
-// They seem to be in the same module, so we just use them.
-
 @ModelActor
 actor PersistenceManager {
+    func updateMemorySaved(bytes: Int64) throws {
+        let descriptor = FetchDescriptor<MemorySaved>()
+        let records = try modelContext.fetch(descriptor)
+        let record = records.first ?? MemorySaved()
+        
+        record.totalBytesSaved += bytes
+        
+        if records.isEmpty {
+            modelContext.insert(record)
+        }
+        
+        try modelContext.save()
+    }
+    
     func persist(
         allMetadata: [AssetMetadata],
         rawClusters: [RawCluster],
