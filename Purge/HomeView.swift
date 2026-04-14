@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import Pow
 @preconcurrency import Photos
 
 struct HomeView: View {
@@ -93,6 +94,7 @@ struct HomeView: View {
             Text("Your Scrapbook")
                 .font(PurgeFont.display(42, weight: .bold))
                 .foregroundStyle(PurgeColor.text)
+                .transition(.movingParts.boing)
 
             Text("\(formatted(dynamicPhotoCount)) photos waiting to be organized")
                 .font(PurgeFont.ui(16, weight: .medium))
@@ -104,14 +106,21 @@ struct HomeView: View {
     
     // MARK: - Stats Section
     
+    @State private var statsKey: UUID = UUID()
+    
     private var statsSection: some View {
         VStack(spacing: 24) {
             HStack(spacing: 16) {
                 statCard(title: "Days", value: "\(dayGroups.count)")
+                    .changeEffect(.shine, value: statsKey)
                 statCard(title: "Photos", value: "\(dayGroups.reduce(0) { $0 + $1.photoCount })")
+                    .changeEffect(.shine, value: statsKey)
             }
         }
         .padding(.horizontal, 24)
+        .onChange(of: dayGroups.count) { _, _ in
+            statsKey = UUID()
+        }
     }
     
     private func statCard(title: String, value: String) -> some View {
@@ -130,6 +139,8 @@ struct HomeView: View {
     
     // MARK: - Rescan Button
     
+    @State private var isRescanPressed = false
+    
     private var rescanButton: some View {
         Button(action: {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -144,9 +155,22 @@ struct HomeView: View {
                 .shadow(color: PurgeColor.text.opacity(0.2), radius: 16, x: 0, y: 8)
         }
         .buttonStyle(ScrapbookButtonStyle())
+        .scaleEffect(isRescanPressed ? 0.9 : 1.0)
+        .changeEffect(.jump(height: 6), value: isRescanPressed, isEnabled: true)
         .disabled(scanProgress != nil)
         .opacity(scanProgress != nil ? 0.5 : 1.0)
-        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: scanProgress != nil)
+        .onChange(of: scanProgress) { _, newValue in
+            if newValue != nil {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                    isRescanPressed = true
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        isRescanPressed = false
+                    }
+                }
+            }
+        }
     }
     
     // MARK: - Placeholders

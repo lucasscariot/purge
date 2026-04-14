@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A05F8D862F8E4C9A00267AEB /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = A05F8D852F8E4C9A00267AEB /* Pow */; };
 		F1AA00012F8B900000000001 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = F1AA00002F8B900000000001 /* FirebaseAnalytics */; };
 /* End PBXBuildFile section */
 
@@ -28,6 +29,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F1AA00012F8B900000000001 /* FirebaseAnalytics in Frameworks */,
+				A05F8D862F8E4C9A00267AEB /* Pow in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +73,7 @@
 			name = Purge;
 			packageProductDependencies = (
 				F1AA00002F8B900000000001 /* FirebaseAnalytics */,
+				A05F8D852F8E4C9A00267AEB /* Pow */,
 			);
 			productName = Purge;
 			productReference = A5AB72D32F8B84BB00374CCD /* Purge.app */;
@@ -102,6 +105,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F1AA00102F8B900000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				A05F8D842F8E4C9A00267AEB /* XCRemoteSwiftPackageReference "Pow" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A5AB72D42F8B84BB00374CCD /* Products */;
@@ -347,6 +351,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		A05F8D842F8E4C9A00267AEB /* XCRemoteSwiftPackageReference "Pow" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/EmergeTools/Pow";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.6;
+			};
+		};
 		F1AA00102F8B900000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
@@ -358,6 +370,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A05F8D852F8E4C9A00267AEB /* Pow */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A05F8D842F8E4C9A00267AEB /* XCRemoteSwiftPackageReference "Pow" */;
+			productName = Pow;
+		};
 		F1AA00002F8B900000000001 /* FirebaseAnalytics */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = F1AA00102F8B900000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
