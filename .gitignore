@@ -1,0 +1,22 @@
+## iOS
+DerivedData/
+*.xcuserstate
+xcuserdata/
+build/
+Build/
+*.xccheckout
+*.xcscmblueprint
+*.xcworkspace/contents.xcworkspacedata
+!.gitkeep
+
+## macOS
+.DS_Store
+*.swp
+
+## Build logs
+*.log
+
+## Xcode
+project.xcworkspace/
+!project.xcworkspace/xcshareddata/
+xcshareddata/
