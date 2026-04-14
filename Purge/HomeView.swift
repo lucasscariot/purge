@@ -31,12 +31,14 @@ struct HomeView: View {
         scanEngine.photoCount
     }
 
+    @State private var scrollOffset: CGFloat = 0
+    
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
-                DotGridBackground(scanProgress: scanProgress)
+                DotGridBackground(scanProgress: scanProgress, scrollOffset: scrollOffset)
                 
-                ScrollView {
+                ScrollView(.vertical, showsIndicators: false) {
                     VStack(spacing: 48) {
                         VStack(spacing: 0) {
                             Color.clear.frame(height: topSafeArea)
@@ -353,8 +355,10 @@ private final class SendableBox: @unchecked Sendable {
 
 struct DotGridBackground: View {
     let scanProgress: Double?
+    let scrollOffset: CGFloat
     
     @State private var phase: CGFloat = 0
+    @State private var touchBounce: CGFloat = 0
     
     var body: some View {
         Canvas { context, size in
@@ -365,6 +369,7 @@ struct DotGridBackground: View {
             
             let progress = scanProgress ?? 0
             let isScanning = progress > 0 && progress < 1
+            let bounce = touchBounce * 8
             
             var x: CGFloat = spacing / 2
             while x < size.width {
@@ -388,8 +393,12 @@ struct DotGridBackground: View {
                             opacity: 0.6 + animatedWave * 0.4
                         )
                     } else {
-                        dotSize = baseDotSize + CGFloat(waveOffset) * 0.8
-                        dotColor = colorIntensity.opacity(0.5 + waveOffset * 0.5)
+                        let touchOffset = sin((x + y) / 30 + scrollOffset / 2) * 0.5 + 0.5
+                        let bounceScale = touchBounce > 0 ? touchOffset * bounce : 0
+                        dotSize = baseDotSize + CGFloat(waveOffset) * 0.8 + bounceScale
+                        dotColor = touchBounce > 0 
+                            ? Color(hex: "E5E3E0").opacity(0.5 + touchOffset * 0.5 + touchOffset * 0.3)
+                            : colorIntensity.opacity(0.5 + waveOffset * 0.5)
                     }
                     
                     let rect = CGRect(x: x - dotSize/2, y: y - dotSize/2, width: dotSize, height: dotSize)
@@ -403,6 +412,18 @@ struct DotGridBackground: View {
         .onAppear {
             withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
                 phase = .pi * 2
+            }
+        }
+        .onChange(of: scrollOffset) { oldValue, newValue in
+            if abs(newValue - oldValue) > 1 {
+                withAnimation(.spring(response: 0.15, dampingFraction: 0.6)) {
+                    touchBounce = 1
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        touchBounce = 0
+                    }
+                }
             }
         }
     }
