@@ -4,6 +4,13 @@ import Pow
 import UIKit
 @preconcurrency import Photos
 
+struct ScrollViewContentHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 struct HomeView: View {
     let photoCount: Int
     let scanProgress: Double?
@@ -17,6 +24,7 @@ struct HomeView: View {
 
     @State private var selectedDayGroup: DayGroup?
     @State private var isAppeared = false
+    @State private var contentHeight: CGFloat = 0
     @State private var funName: String = [
         "sunshine", "hero", "smart-ass", "rockstar", "legend",
         "champ", "superstar", "genius", "boss", "chief",
@@ -87,6 +95,16 @@ struct HomeView: View {
                                 
                                 Color.clear.frame(height: 120)
                             }
+                            .background(
+                                GeometryReader { geo in
+                                    Color.clear.preference(key: ScrollViewContentHeightKey.self, value: geo.size.height)
+                                }
+                            )
+                        }
+                    }
+                    .onPreferenceChange(ScrollViewContentHeightKey.self) { height in
+                        DispatchQueue.main.async {
+                            contentHeight = height
                         }
                     }
                     .scrollIndicators(.hidden)
@@ -115,15 +133,15 @@ struct HomeView: View {
                     }
                     
                     if !dayGroups.isEmpty && groupedPreviousDays.count > 1 {
-                        HStack {
+                        HStack(alignment: .top) {
                             Spacer()
                             TimelineScrubber(
                                 months: groupedPreviousDays.map { $0.id },
                                 proxy: proxy
                             )
-                            .padding(.trailing, 8)
+                            .frame(maxHeight: contentHeight > 0 ? max(0, contentHeight - topSafeArea - 24) : .infinity)
+                            .padding(.trailing, 0)
                             .padding(.top, topSafeArea + 24)
-                            .padding(.bottom, 120)
                         }
                     }
                 }
