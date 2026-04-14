@@ -10,6 +10,7 @@ struct DayDetailOverlay: View {
     @GestureState private var isDragging = false
     @State private var isSelectionMode = false
     @State private var selectedPhotos: Set<String> = []
+    @State private var isAnyPhotoZooming = false
     
     private let columns = [
         GridItem(.flexible(), spacing: 8),
@@ -82,6 +83,7 @@ struct DayDetailOverlay: View {
                     .padding(.top, 60)
                     .padding(.bottom, 120)
                 }
+                .scrollDisabled(isAnyPhotoZooming)
                 .background(
                     Rectangle()
                         .fill(.ultraThinMaterial)
@@ -135,6 +137,9 @@ struct DayDetailOverlay: View {
                             toggleSelection(photo)
                         }
                     }
+                },
+                onZoomChanged: { isZooming in
+                    isAnyPhotoZooming = isZooming
                 }
             )
             .clipShape(RoundedRectangle(cornerRadius: 12))

@@ -5,6 +5,7 @@ import Photos
 struct PinchablePhotoCard: View {
     let localIdentifier: String
     let onTap: () -> Void
+    var onZoomChanged: ((Bool) -> Void)? = nil
     
     @State private var isZooming = false
     @State private var zoomImage: UIImage?
@@ -96,6 +97,7 @@ struct PinchablePhotoCard: View {
             zoomImage = await loadHighQualityImage()
             await MainActor.run {
                 isZooming = true
+                onZoomChanged?(true)
                 withAnimation(.easeInOut(duration: 0.2)) {
                     backgroundOpacity = 1.0
                 }
@@ -120,11 +122,12 @@ struct PinchablePhotoCard: View {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             currentScale = 1.0
             backgroundOpacity = 0.0
-            lastCenterPoint = CGPoint(x: startingFrame.midX, y: startingFrame.midY)
+            lastCenterPoint = CGPoint(x: thumbnailGlobalFrame.midX, y: thumbnailGlobalFrame.midY)
         }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             isZooming = false
+            onZoomChanged?(false)
             currentScale = 1.0
             startingFrame = .zero
             lastCenterPoint = .zero
