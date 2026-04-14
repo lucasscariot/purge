@@ -73,18 +73,18 @@ struct PinchablePhotoCard: View {
     }
     
     private func zoomedImageView(image: UIImage) -> some View {
-        Color.black.opacity(backgroundOpacity)
-            .ignoresSafeArea()
-            .overlay(
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: startingFrame.width, height: startingFrame.height)
-                    .clipped()
-                    .scaleEffect(currentScale)
-                    .position(x: lastCenterPoint.x, y: lastCenterPoint.y)
-            )
-            .contentShape(Rectangle())
+        ZStack {
+            Color.black.opacity(backgroundOpacity)
+            
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: startingFrame.width, height: startingFrame.height)
+                .clipped()
+                .scaleEffect(currentScale)
+                .position(x: lastCenterPoint.x, y: lastCenterPoint.y)
+        }
+        .ignoresSafeArea()
     }
     
     private func startZoom(location: CGPoint) {
