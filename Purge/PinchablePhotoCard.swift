@@ -12,6 +12,7 @@ struct PinchablePhotoCard: View {
     @State private var startingFrame: CGRect = .zero
     @State private var thumbnailGlobalFrame: CGRect = .zero
     @State private var currentScale: CGFloat = 1.0
+    @State private var currentRotation: Angle = .zero
     @State private var isAnimating = false
     @State private var backgroundOpacity: Double = 0.0
     
@@ -40,9 +41,9 @@ struct PinchablePhotoCard: View {
                             startZoom(location: location)
                         }
                     },
-                    onChanged: { scale, location in
+                    onChanged: { scale, rotation, location in
                         if isZooming {
-                            updateZoom(scale: scale, location: location)
+                            updateZoom(scale: scale, rotation: rotation, location: location)
                         }
                     },
                     onEnded: {
@@ -83,6 +84,7 @@ struct PinchablePhotoCard: View {
                 .clipShape(RoundedRectangle(cornerRadius: 12 / currentScale))
                 .clipped()
                 .scaleEffect(currentScale)
+                .rotationEffect(currentRotation)
                 .position(x: lastCenterPoint.x, y: lastCenterPoint.y)
         }
         .ignoresSafeArea()
@@ -93,6 +95,7 @@ struct PinchablePhotoCard: View {
         firstCenterPoint = location
         lastCenterPoint = CGPoint(x: startingFrame.midX, y: startingFrame.midY)
         currentScale = 1.0
+        currentRotation = .zero
         
         Task {
             zoomImage = await loadHighQualityImage()
@@ -106,14 +109,24 @@ struct PinchablePhotoCard: View {
         }
     }
     
-    private func updateZoom(scale: CGFloat, location: CGPoint) {
+    private func updateZoom(scale: CGFloat, rotation: Angle, location: CGPoint) {
         let newScale = min(max(scale, minScale), maxScale)
         currentScale = newScale
+        currentRotation = rotation
         
-        let newCenterX = location.x - (firstCenterPoint.x - startingFrame.midX) * newScale
-        let newCenterY = location.y - (firstCenterPoint.y - startingFrame.midY) * newScale
+        let dx = firstCenterPoint.x - startingFrame.midX
+        let dy = firstCenterPoint.y - startingFrame.midY
         
-        lastCenterPoint = CGPoint(x: newCenterX, y: newCenterY)
+        let scaledDx = dx * newScale
+        let scaledDy = dy * newScale
+        
+        let cosTheta = cos(rotation.radians)
+        let sinTheta = sin(rotation.radians)
+        
+        let rotatedDx = scaledDx * cosTheta - scaledDy * sinTheta
+        let rotatedDy = scaledDx * sinTheta + scaledDy * cosTheta
+        
+        lastCenterPoint = CGPoint(x: location.x - rotatedDx, y: location.y - rotatedDy)
     }
     
     private func dismissZoom() {
@@ -122,6 +135,7 @@ struct PinchablePhotoCard: View {
         
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
             currentScale = 1.0
+            currentRotation = .zero
             backgroundOpacity = 0.0
             lastCenterPoint = CGPoint(x: thumbnailGlobalFrame.midX, y: thumbnailGlobalFrame.midY)
         }
@@ -130,6 +144,7 @@ struct PinchablePhotoCard: View {
             isZooming = false
             onZoomChanged?(false)
             currentScale = 1.0
+            currentRotation = .zero
             startingFrame = .zero
             lastCenterPoint = .zero
             firstCenterPoint = .zero
@@ -210,7 +225,7 @@ private struct FullscreenWindowOverlay<Content: View>: UIViewControllerRepresent
 
 private struct ZoomGestureOverlay: UIViewRepresentable {
     var onBegan: ((CGPoint) -> Void)
-    var onChanged: ((CGFloat, CGPoint) -> Void)
+    var onChanged: ((CGFloat, Angle, CGPoint) -> Void)
     var onEnded: (() -> Void)
     var onTap: (() -> Void)
     
@@ -221,6 +236,10 @@ private struct ZoomGestureOverlay: UIViewRepresentable {
         let pinch = UIPinchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePinch(_:)))
         pinch.delegate = context.coordinator
         view.addGestureRecognizer(pinch)
+        
+        let rotation = UIRotationGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleRotation(_:)))
+        rotation.delegate = context.coordinator
+        view.addGestureRecognizer(rotation)
         
         let tap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
         tap.delegate = context.coordinator
@@ -242,33 +261,65 @@ private struct ZoomGestureOverlay: UIViewRepresentable {
     
     class Coordinator: NSObject, UIGestureRecognizerDelegate {
         var onBegan: ((CGPoint) -> Void)
-        var onChanged: ((CGFloat, CGPoint) -> Void)
+        var onChanged: ((CGFloat, Angle, CGPoint) -> Void)
         var onEnded: (() -> Void)
         var onTap: (() -> Void)
         
-        init(onBegan: @escaping (CGPoint) -> Void, onChanged: @escaping (CGFloat, CGPoint) -> Void, onEnded: @escaping () -> Void, onTap: @escaping () -> Void) {
+        var currentScale: CGFloat = 1.0
+        var currentRotation: CGFloat = 0.0
+        var currentLocation: CGPoint = .zero
+        
+        init(onBegan: @escaping (CGPoint) -> Void, onChanged: @escaping (CGFloat, Angle, CGPoint) -> Void, onEnded: @escaping () -> Void, onTap: @escaping () -> Void) {
             self.onBegan = onBegan
             self.onChanged = onChanged
             self.onEnded = onEnded
             self.onTap = onTap
         }
         
-        @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
-            guard let window = UIApplication.shared.connectedScenes
+        private func getWindow() -> UIWindow? {
+            return UIApplication.shared.connectedScenes
                 .compactMap({ $0 as? UIWindowScene })
                 .flatMap({ $0.windows })
-                .first(where: { $0.isKeyWindow }) else { return }
+                .first(where: { $0.isKeyWindow })
+        }
+        
+        @objc func handlePinch(_ gesture: UIPinchGestureRecognizer) {
+            guard let window = getWindow() else { return }
             
             let location = gesture.location(in: window)
+            currentLocation = location
             
             switch gesture.state {
             case .began:
                 if gesture.numberOfTouches >= 2 {
+                    currentScale = gesture.scale
                     onBegan(location)
                 }
             case .changed:
-                onChanged(gesture.scale, location)
+                currentScale = gesture.scale
+                onChanged(currentScale, Angle(radians: Double(currentRotation)), location)
             case .ended, .cancelled, .failed:
+                currentScale = 1.0
+                onEnded()
+            default:
+                break
+            }
+        }
+        
+        @objc func handleRotation(_ gesture: UIRotationGestureRecognizer) {
+            guard let window = getWindow() else { return }
+            
+            let location = gesture.location(in: window)
+            currentLocation = location
+            
+            switch gesture.state {
+            case .began:
+                currentRotation = gesture.rotation
+            case .changed:
+                currentRotation = gesture.rotation
+                onChanged(currentScale, Angle(radians: Double(currentRotation)), location)
+            case .ended, .cancelled, .failed:
+                currentRotation = 0.0
                 onEnded()
             default:
                 break
