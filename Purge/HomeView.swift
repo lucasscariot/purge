@@ -16,6 +16,19 @@ struct HomeView: View {
     @Query private var memorySavedRecords: [MemorySaved]
 
     @State private var selectedDayGroup: DayGroup?
+    @State private var isAppeared = false
+    @State private var funName: String = [
+        "sunshine", "hero", "smart-ass", "rockstar", "legend",
+        "champ", "superstar", "genius", "boss", "chief",
+        "captain", "maestro", "hotshot", "maverick", "tiger",
+        "wizard", "ninja", "guru", "star", "darling",
+        "sweetie", "honey", "pumpkin", "buttercup", "cupcake",
+        "muffin", "peanut", "bean", "nugget", "sprout",
+        "firecracker", "sparky", "wildcat", "troublemaker", "rebel",
+        "outlaw", "bandit", "rascal", "scamp", "sport",
+        "pal", "mate", "amigo", "bossman", "bosslady",
+        "detective", "sleuth", "purger", "cleaner", "magician"
+    ].randomElement() ?? "friend"
 
     private var totalMemorySaved: Int64 {
         memorySavedRecords.first?.totalBytesSaved ?? 0
@@ -33,66 +46,90 @@ struct HomeView: View {
         scanEngine.photoCount
     }
 
-    
+    private var greeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let timeGreeting: String
+        switch hour {
+        case 0..<12: timeGreeting = "Good morning"
+        case 12..<17: timeGreeting = "Good afternoon"
+        default: timeGreeting = "Good evening"
+        }
+        return "\(timeGreeting), \(funName)"
+    }
     
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .top) {
-                PurgeColor.background
-                    .ignoresSafeArea()
-                
-                ScrollView(.vertical, showsIndicators: false) {
-                    ZStack(alignment: .topLeading) {
-                        DotGridBackground()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .offset(y: -topSafeArea)
-                        
-                        VStack(spacing: 48) {
-                            Color.clear.frame(height: topSafeArea)
+            ScrollViewReader { proxy in
+                ZStack(alignment: .top) {
+                    PurgeColor.background
+                        .ignoresSafeArea()
+                    
+                    ScrollView(.vertical, showsIndicators: false) {
+                        ZStack(alignment: .topLeading) {
+                            DotGridBackground()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .offset(y: -topSafeArea)
                             
-                            heroSection
-                                .padding(.top, 16)
-                            
-                            if scanProgress != nil {
-                                scanningState
-                            } else if dayGroups.isEmpty {
-                                emptyState
-                            } else {
-                                photoStacksSection
+                            VStack(spacing: 24) {
+                                Color.clear.frame(height: topSafeArea)
+                                
+                                heroSection
                                     .padding(.top, 16)
+                                
+                                if scanProgress != nil {
+                                    scanningState
+                                } else if dayGroups.isEmpty {
+                                    emptyState
+                                } else {
+                                    photoStacksSection
+                                        .padding(.top, 16)
+                                }
+                                
+                                Color.clear.frame(height: 120)
                             }
-                            
-                            Color.clear.frame(height: 120)
                         }
                     }
-                }
-                .scrollIndicators(.hidden)
-                
-                VStack {
-                    Spacer()
-                    HStack {
+                    .scrollIndicators(.hidden)
+                    
+                    VStack {
                         Spacer()
-                        rescanButton
-                    }
-                    .padding(24)
-                }
-                
-                if let group = selectedDayGroup {
-                    DayDetailOverlay(
-                        dayGroup: group,
-                        onDismiss: { selectedDayGroup = nil },
-                        onRemovePhotos: { identifiers in
-                            scanEngine.trashItems(
-                                identifiers: Set(identifiers),
-                                context: modelContext,
-                                dismissCallback: { selectedDayGroup = nil }
-                            )
+                        HStack {
+                            Spacer()
+                            rescanButton
                         }
-                    )
+                        .padding(24)
+                    }
+                    
+                    if let group = selectedDayGroup {
+                        DayDetailOverlay(
+                            dayGroup: group,
+                            onDismiss: { selectedDayGroup = nil },
+                            onRemovePhotos: { identifiers in
+                                scanEngine.trashItems(
+                                    identifiers: Set(identifiers),
+                                    context: modelContext,
+                                    dismissCallback: { selectedDayGroup = nil }
+                                )
+                            }
+                        )
+                    }
+                    
+                    if !dayGroups.isEmpty && groupedPreviousDays.count > 1 {
+                        HStack {
+                            Spacer()
+                            TimelineScrubber(
+                                months: groupedPreviousDays.map { $0.id },
+                                proxy: proxy
+                            )
+                            .padding(.trailing, 8)
+                            .padding(.top, topSafeArea + 24)
+                            .padding(.bottom, 120)
+                        }
+                    }
                 }
+                .ignoresSafeArea()
+                .toolbar(.hidden, for: .navigationBar)
             }
-            .ignoresSafeArea()
-            .toolbar(.hidden, for: .navigationBar)
         }
     }
     
@@ -104,30 +141,78 @@ struct HomeView: View {
     
     // MARK: - Hero
     
-    private var heroSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Saved \(formatBytes(totalMemorySaved))")
-                    .font(PurgeFont.cursive(22))
-                    .foregroundStyle(PurgeColor.mustard)
-                if totalPhotosRemoved > 0 {
-                    Text("\(totalPhotosRemoved) photos removed")
-                        .font(PurgeFont.cursive(16))
-                        .foregroundStyle(PurgeColor.mustard.opacity(0.7))
-                }
+    private var statsPill: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "internaldrive.fill")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(PurgeColor.mustard)
+            
+            HStack(spacing: 4) {
+                Text("Saved")
+                    .foregroundStyle(PurgeColor.textMuted)
+                Text(formatBytes(totalMemorySaved))
+                    .foregroundStyle(PurgeColor.text)
             }
-
-            Text("Your Scrapbook")
-                .font(PurgeFont.display(42, weight: .bold))
-                .foregroundStyle(PurgeColor.text)
-                .transition(.movingParts.boing)
-
-            Text("\(formatted(dynamicPhotoCount)) photos waiting to be organized")
-                .font(PurgeFont.ui(16, weight: .medium))
-                .foregroundStyle(PurgeColor.textMuted)
+            .font(PurgeFont.ui(14, weight: .semibold))
+            
+            if totalPhotosRemoved > 0 {
+                Circle()
+                    .frame(width: 3, height: 3)
+                    .foregroundStyle(PurgeColor.textMuted.opacity(0.5))
+                
+                Text("\(totalPhotosRemoved) removed")
+                    .font(PurgeFont.ui(14, weight: .medium))
+                    .foregroundStyle(PurgeColor.textMuted)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.5)
+        )
+        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
+    }
+    
+    private var heroSection: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            if totalMemorySaved > 0 {
+                statsPill
+                    .opacity(isAppeared ? 1 : 0)
+                    .offset(y: isAppeared ? 0 : -15)
+            }
+            
+            VStack(alignment: .leading, spacing: 6) {
+                Text(greeting)
+                    .font(PurgeFont.ui(16, weight: .semibold))
+                    .foregroundStyle(PurgeColor.textMuted)
+                    .textCase(.uppercase)
+                    .kerning(1.2)
+                    .opacity(isAppeared ? 1 : 0)
+                    .offset(y: isAppeared ? 0 : 15)
+                
+                Text("Your Scrapbook")
+                    .font(PurgeFont.display(42, weight: .bold))
+                    .foregroundStyle(PurgeColor.text)
+                    .opacity(isAppeared ? 1 : 0)
+                    .offset(y: isAppeared ? 0 : 15)
+                
+                Text("\(formatted(dynamicPhotoCount)) photos waiting to be organized")
+                    .font(PurgeFont.ui(16, weight: .medium))
+                    .foregroundStyle(PurgeColor.textMuted)
+                    .opacity(isAppeared ? 1 : 0)
+                    .offset(y: isAppeared ? 0 : 15)
+            }
         }
         .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear {
+            withAnimation(.spring(response: 0.7, dampingFraction: 0.8).delay(0.1)) {
+                isAppeared = true
+            }
+        }
     }
     
     // MARK: - Stats Section
@@ -152,7 +237,7 @@ struct HomeView: View {
 // MARK: - Photo Stacks Section
     
     private var photoStacksSection: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 12) {
             onThisDaySection
             previousDaysSection
         }
@@ -191,32 +276,59 @@ struct HomeView: View {
         }
     }
     
-    private var previousDaysSection: some View {
+    private var groupedPreviousDays: [(id: String, date: Date, days: [DayGroup])] {
         let calendar = Calendar.current
         let today = Date()
         let todayMonth = calendar.component(.month, from: today)
         let todayDay = calendar.component(.day, from: today)
         
-        let previousDays = dayGroups.filter { group in
+        let previous = dayGroups.filter { group in
             let month = calendar.component(.month, from: group.date)
             let day = calendar.component(.day, from: group.date)
             return !(month == todayMonth && day == todayDay)
         }.sorted { $0.date > $1.date }
         
+        var groups: [String: [DayGroup]] = [:]
+        var dates: [String: Date] = [:]
+        
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM yyyy"
+        
+        for day in previous {
+            let key = formatter.string(from: day.date)
+            if groups[key] == nil {
+                groups[key] = []
+                dates[key] = day.date
+            }
+            groups[key]?.append(day)
+        }
+        
+        return groups.map { (id: $0.key, date: dates[$0.key]!, days: $0.value) }
+            .sorted { $0.date > $1.date }
+    }
+    
+    private var previousDaysSection: some View {
+        let grouped = groupedPreviousDays
+        
         return Group {
-            if !previousDays.isEmpty {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Previous Days")
-                        .font(PurgeFont.display(24, weight: .bold))
-                        .foregroundStyle(PurgeColor.text)
-                        .padding(.horizontal, 24)
-                    
-                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
-                        ForEach(previousDays) { day in
-                            photoStackItem(group: day)
+            if !grouped.isEmpty {
+                VStack(alignment: .leading, spacing: 32) {
+                    ForEach(grouped, id: \.id) { group in
+                        VStack(alignment: .leading, spacing: 16) {
+                            Text(group.id.uppercased())
+                                .font(PurgeFont.display(24, weight: .bold))
+                                .foregroundStyle(PurgeColor.text)
+                                .padding(.horizontal, 24)
+                                .id(group.id)
+                            
+                            LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
+                                ForEach(group.days) { day in
+                                    photoStackItem(group: day)
+                                }
+                            }
+                            .padding(.horizontal, 24)
                         }
                     }
-                    .padding(.horizontal, 24)
                 }
             }
         }
@@ -228,23 +340,25 @@ struct HomeView: View {
         }
         .frame(width: 160, height: 160)
         
-        return VStack(spacing: 6) {
+        return VStack(spacing: 2) {
             stack
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
             
-            VStack(spacing: 2) {
+            VStack(spacing: 4) {
                 Text(formattedDate(group.date))
-                    .font(PurgeFont.cursive(14))
-                    .fontWeight(.medium)
-                    .foregroundStyle(PurgeColor.textMuted)
+                    .font(PurgeFont.ui(15, weight: .semibold))
+                    .foregroundStyle(PurgeColor.text)
                 
                 if group.nearDuplicateCount > 0 {
                     Text("\(group.nearDuplicateCount) near-dups")
-                        .font(PurgeFont.cursive(10))
-                        .foregroundStyle(PurgeColor.warning)
+                        .font(PurgeFont.ui(11, weight: .bold))
+                        .foregroundStyle(PurgeColor.rose)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(PurgeColor.rose.opacity(0.15))
+                        .clipShape(Capsule())
                 }
             }
+            .frame(minHeight: 48, alignment: .top)
         }
     }
     
