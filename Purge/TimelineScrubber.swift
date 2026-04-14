@@ -56,8 +56,8 @@ struct TimelineScrubber: View {
                                 ))
                         }
                     }
-                    .offset(y: min(max(dragOffset, thumbRadius), trackHeight - thumbRadius) - trackHeight / 2)
                     .scaleEffect(isDragging ? 1.4 : 1.0)
+                    .offset(y: min(max(dragOffset, thumbRadius), trackHeight - thumbRadius) - trackHeight / 2)
                     .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isDragging)
                 }
                 .frame(width: 14)
