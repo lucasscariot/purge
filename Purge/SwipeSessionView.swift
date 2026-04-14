@@ -179,6 +179,7 @@ struct SwipeSessionView: View {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     showComplete = true
                 }
+                AnalyticsService.logSwipeSessionCompleted(kept: keptCount, trashed: trashedCount, favourited: favouritedCount)
             }
         }
     }

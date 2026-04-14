@@ -19,7 +19,9 @@ final class ImageCache {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.imageCache.removeAllObjects()
+            Task { @MainActor [weak self] in
+                self?.imageCache.removeAllObjects()
+            }
         }
     }
     

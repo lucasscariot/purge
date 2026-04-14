@@ -5,9 +5,11 @@ import Photos
 @Model
 final class MemorySaved {
     var totalBytesSaved: Int64
-    
-    init(totalBytesSaved: Int64 = 0) {
+    var totalPhotosRemoved: Int
+
+    init(totalBytesSaved: Int64 = 0, totalPhotosRemoved: Int = 0) {
         self.totalBytesSaved = totalBytesSaved
+        self.totalPhotosRemoved = totalPhotosRemoved
     }
 }
 

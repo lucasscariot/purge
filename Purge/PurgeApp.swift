@@ -1,12 +1,16 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import CoreText
+import FirebaseCore
 
 @main
 struct PurgeApp: App {
     @State private var scanEngine = ScanEngine()
-    
+
     init() {
+        FirebaseApp.configure()
+        Self.registerCustomFonts()
         UNUserNotificationCenter.current().delegate = NotificationManager.shared
         
         // Check if we already asked for permission before — only send "thank you" on first grant
@@ -38,6 +42,21 @@ struct PurgeApp: App {
         }
         .modelContainer(for: [AssetRecord.self, ClusterRecord.self, MemorySaved.self])
     }
+
+    private static func registerCustomFonts() {
+        let fontNames = ["Delius-Regular"]
+        for name in fontNames {
+            guard let url = Bundle.main.url(forResource: name, withExtension: "ttf", subdirectory: "Resources/Fonts")
+                    ?? Bundle.main.url(forResource: name, withExtension: "ttf") else {
+                print("[PURGE] Font file not found: \(name).ttf")
+                continue
+            }
+            var error: Unmanaged<CFError>?
+            if !CTFontManagerRegisterFontsForURL(url as CFURL, .process, &error) {
+                print("[PURGE] Failed to register font \(name): \(error?.takeRetainedValue().localizedDescription ?? "unknown")")
+            }
+        }
+    }
 }
 
 // MARK: - Content Root
@@ -53,6 +72,7 @@ struct ContentRootView: View {
             // phase = .complete and populates dayGroups if data exists.
             .task {
                 scanEngine.loadExistingClusters(context: modelContext)
+                AnalyticsService.logAppOpen()
             }
     }
 

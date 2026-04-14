@@ -3,17 +3,18 @@ import SwiftData
 
 @ModelActor
 actor PersistenceManager {
-    func updateMemorySaved(bytes: Int64) throws {
+    func updateMemorySaved(bytes: Int64, photoCount: Int) throws {
         let descriptor = FetchDescriptor<MemorySaved>()
         let records = try modelContext.fetch(descriptor)
         let record = records.first ?? MemorySaved()
-        
+
         record.totalBytesSaved += bytes
-        
+        record.totalPhotosRemoved += photoCount
+
         if records.isEmpty {
             modelContext.insert(record)
         }
-        
+
         try modelContext.save()
     }
     

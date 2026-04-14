@@ -43,7 +43,7 @@ enum PurgeFont {
     }
 
     static func cursive(_ size: CGFloat) -> Font {
-        .custom("PlaywriteCU-Regular", size: size)
+        .custom("Delius-Regular", size: size)
     }
 
     /// UI labels, buttons, metadata — SF Pro Rounded

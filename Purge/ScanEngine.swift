@@ -85,11 +85,11 @@ final class ScanEngine {
     /// Tracks whether a deletion is currently in progress.
     var isDeleting: Bool { pendingDeletion != nil }
     
-    private func updateMemorySaved(bytes: Int64, context: ModelContext) {
+    private func updateMemorySaved(bytes: Int64, photoCount: Int, context: ModelContext) {
         Task {
             let container = context.container
             let persistence = PersistenceManager(modelContainer: container)
-            try? await persistence.updateMemorySaved(bytes: bytes)
+            try? await persistence.updateMemorySaved(bytes: bytes, photoCount: photoCount)
         }
     }
 
@@ -163,7 +163,8 @@ final class ScanEngine {
         
         // Calculate bytes saved
         let bytesSaved = calculateBytesSaved(identifiers: identifiers, context: context)
-        updateMemorySaved(bytes: bytesSaved, context: context)
+        updateMemorySaved(bytes: bytesSaved, photoCount: identifiers.count, context: context)
+        AnalyticsService.logPhotosRemoved(count: identifiers.count, bytesSaved: bytesSaved)
         
         dayGroups = dayGroups.compactMap { day in
             let remaining = day.photos.filter { !identifiers.contains($0.localIdentifier ?? "") }
@@ -488,6 +489,7 @@ final class ScanEngine {
         await MainActor.run {
             phase = .complete
             NotificationService.checkAndScheduleNotifications(for: dayGroups)
+            AnalyticsService.logScanCompleted(photoCount: photoCount, dayGroupCount: dayGroups.count)
         }
 
         // ── 8. Background geocoding ────────────────────────────────────────

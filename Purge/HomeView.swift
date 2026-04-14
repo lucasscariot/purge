@@ -14,9 +14,13 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var selectedDay: DayGroup?
     @Query private var memorySavedRecords: [MemorySaved]
-    
+
     private var totalMemorySaved: Int64 {
         memorySavedRecords.first?.totalBytesSaved ?? 0
+    }
+
+    private var totalPhotosRemoved: Int {
+        memorySavedRecords.first?.totalPhotosRemoved ?? 0
     }
 
     private var dayGroups: [DayGroup] {
@@ -83,6 +87,14 @@ struct HomeView: View {
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(item: $selectedDay) { day in
                 DayDetailView(dayId: day.id)
+                    .onAppear {
+                        let formatter = DateFormatter()
+                        formatter.dateFormat = "yyyy-MM-dd"
+                        AnalyticsService.logDayOpened(
+                            photoCount: day.photoCount,
+                            date: formatter.string(from: day.date)
+                        )
+                    }
             }
         }
     }
@@ -176,20 +188,26 @@ struct HomeView: View {
     // MARK: - Hero
     
     private var heroSection: some View {
-            VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("Saved \(formatBytes(totalMemorySaved))")
                     .font(PurgeFont.cursive(22))
                     .foregroundStyle(PurgeColor.mustard)
-            
-                Text("Your Scrapbook")
-                    .font(PurgeFont.display(42, weight: .bold))
-                    .foregroundStyle(PurgeColor.text)
-            
-                Text("\(formatted(dynamicPhotoCount)) photos waiting to be organized")
-                    .font(PurgeFont.ui(16, weight: .medium))
-                    .foregroundStyle(PurgeColor.textMuted)
+                if totalPhotosRemoved > 0 {
+                    Text("\(totalPhotosRemoved) photos removed")
+                        .font(PurgeFont.cursive(16))
+                        .foregroundStyle(PurgeColor.mustard.opacity(0.7))
+                }
             }
 
+            Text("Your Scrapbook")
+                .font(PurgeFont.display(42, weight: .bold))
+                .foregroundStyle(PurgeColor.text)
+
+            Text("\(formatted(dynamicPhotoCount)) photos waiting to be organized")
+                .font(PurgeFont.ui(16, weight: .medium))
+                .foregroundStyle(PurgeColor.textMuted)
+        }
         .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -337,7 +355,7 @@ struct DotGridBackground: View {
     var body: some View {
         Canvas { context, size in
             let spacing: CGFloat = 28
-            let dotSize: CGFloat = 2.5
+            let dotSize: CGFloat = 3.5
             let dotColor = Color(hex: "E5E3E0")
             
             context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(PurgeColor.background))
