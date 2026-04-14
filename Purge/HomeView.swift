@@ -15,6 +15,8 @@ struct HomeView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var memorySavedRecords: [MemorySaved]
 
+    @State private var selectedDayGroup: DayGroup?
+
     private var totalMemorySaved: Int64 {
         memorySavedRecords.first?.totalBytesSaved ?? 0
     }
@@ -73,6 +75,13 @@ struct HomeView: View {
                         rescanButton
                     }
                     .padding(24)
+                }
+                
+                if let group = selectedDayGroup {
+                    DayDetailOverlay(
+                        dayGroup: group,
+                        onDismiss: { selectedDayGroup = nil }
+                    )
                 }
             }
             .ignoresSafeArea()
@@ -208,7 +217,7 @@ struct HomeView: View {
     
     private func photoStackItem(group: DayGroup) -> some View {
         let stack = PinchablePhotoStack(photos: group.photos, seed: group.id.hashValue) {
-            // TODO: Navigate to group detail
+            selectedDayGroup = group
         }
         .frame(width: 160, height: 160)
         
