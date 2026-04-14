@@ -40,22 +40,28 @@ struct HomeView: View {
                     .ignoresSafeArea()
                 
                 ScrollView(.vertical, showsIndicators: false) {
-                    VStack(spacing: 48) {
-                        Color.clear.frame(height: topSafeArea)
+                    ZStack(alignment: .topLeading) {
+                        DotGridBackground()
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .offset(y: -topSafeArea)
                         
-                        heroSection
-                            .padding(.top, 16)
-                        
-                        if scanProgress != nil {
-                            scanningState
-                        } else if dayGroups.isEmpty {
-                            emptyState
-} else {
-                            photoStacksSection
+                        VStack(spacing: 48) {
+                            Color.clear.frame(height: topSafeArea)
+                            
+                            heroSection
                                 .padding(.top, 16)
+                            
+                            if scanProgress != nil {
+                                scanningState
+                            } else if dayGroups.isEmpty {
+                                emptyState
+                            } else {
+                                photoStacksSection
+                                    .padding(.top, 16)
+                            }
+                            
+                            Color.clear.frame(height: 120)
                         }
-                        
-                        Color.clear.frame(height: 120)
                     }
                 }
                 .scrollIndicators(.hidden)
@@ -130,19 +136,72 @@ struct HomeView: View {
 // MARK: - Photo Stacks Section
     
     private var photoStacksSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Your Memories")
-                .font(PurgeFont.display(24, weight: .bold))
-                .foregroundStyle(PurgeColor.text)
-                .padding(.horizontal, 24)
-            
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 16) {
-                    ForEach(dayGroups.sorted(by: { $0.date > $1.date }).prefix(10)) { day in
-                        photoStackItem(group: day)
+        VStack(alignment: .leading, spacing: 24) {
+            onThisDaySection
+            previousDaysSection
+        }
+    }
+    
+    private var onThisDaySection: some View {
+        let calendar = Calendar.current
+        let today = Date()
+        let todayMonth = calendar.component(.month, from: today)
+        let todayDay = calendar.component(.day, from: today)
+        
+        let onThisDayGroups = dayGroups.filter { group in
+            let month = calendar.component(.month, from: group.date)
+            let day = calendar.component(.day, from: group.date)
+            return month == todayMonth && day == todayDay && calendar.component(.year, from: group.date) != calendar.component(.year, from: today)
+        }.sorted { $0.date > $1.date }
+        
+        return Group {
+            if !onThisDayGroups.isEmpty {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("On this day")
+                        .font(PurgeFont.display(24, weight: .bold))
+                        .foregroundStyle(PurgeColor.text)
+                        .padding(.horizontal, 24)
+                    
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        LazyHStack(spacing: 16) {
+                            ForEach(onThisDayGroups) { day in
+                                photoStackItem(group: day)
+                            }
+                        }
+                        .padding(.horizontal, 24)
                     }
                 }
-                .padding(.horizontal, 24)
+            }
+        }
+    }
+    
+    private var previousDaysSection: some View {
+        let calendar = Calendar.current
+        let today = Date()
+        let todayMonth = calendar.component(.month, from: today)
+        let todayDay = calendar.component(.day, from: today)
+        
+        let previousDays = dayGroups.filter { group in
+            let month = calendar.component(.month, from: group.date)
+            let day = calendar.component(.day, from: group.date)
+            return !(month == todayMonth && day == todayDay)
+        }.sorted { $0.date > $1.date }
+        
+        return Group {
+            if !previousDays.isEmpty {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Previous Days")
+                        .font(PurgeFont.display(24, weight: .bold))
+                        .foregroundStyle(PurgeColor.text)
+                        .padding(.horizontal, 24)
+                    
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
+                        ForEach(previousDays) { day in
+                            photoStackItem(group: day)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                }
             }
         }
     }
@@ -153,9 +212,22 @@ struct HomeView: View {
         }
         .frame(width: 160, height: 160)
         
-        return stack
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+        return VStack(spacing: 6) {
+            stack
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+            
+            Text(formattedDate(group.date))
+                .font(PurgeFont.cursive(14))
+                .fontWeight(.medium)
+                .foregroundStyle(PurgeColor.textMuted)
+        }
+    }
+    
+    private func formattedDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: date)
     }
     
     // MARK: - Stat Card

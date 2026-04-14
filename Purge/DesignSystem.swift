@@ -250,7 +250,7 @@ struct AsyncPhotoImage: View {
             .firstObject
         else { return }
 
-        self.image = await withTaskCancellationHandler {
+self.image = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 ImageCache.shared.requestImage(for: asset, targetSize: targetSize, ignoreDegraded: true) { image in
                     continuation.resume(returning: image)
@@ -261,5 +261,38 @@ struct AsyncPhotoImage: View {
                 ImageCache.shared.cancelRequest(for: localIdentifier)
             }
         }
+    }
+}
+
+// MARK: - Dot Grid Background
+
+struct DotGridBackground: View {
+    var dotSize: CGFloat = 3
+    var dotSpacing: CGFloat = 28
+    var dotColor: Color = Color(hex: "E5E3E0").opacity(0.6)
+    
+    var body: some View {
+        Canvas { context, size in
+            let cols = Int(size.width / dotSpacing) + 1
+            let rows = Int(size.height / dotSpacing) + 1
+            
+            for row in 0..<rows {
+                for col in 0..<cols {
+                    let x = CGFloat(col) * dotSpacing
+                    let y = CGFloat(row) * dotSpacing
+                    context.fill(
+                        Circle().path(in: CGRect(x: x, y: y, width: dotSize, height: dotSize)),
+                        with: .color(dotColor)
+                    )
+                }
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+
+extension View {
+    func dotGridBackground() -> some View {
+        background(DotGridBackground())
     }
 }

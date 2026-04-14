@@ -152,16 +152,18 @@ final class PhotoStackOverlayView: UIView {
     }
 
     func updateProgressWithRotation(_ t: CGFloat, rotation: CGFloat) {
-        // Inflate/deflate scale based on pinch progress (unbounded)
-        let inflateScale = 1.0 + (max(0, t) * 0.08)
+        // Zoom effect (more sensitive) - scale up images
+        let zoomScale = 1.0 + (max(0, t) * 0.25)
+        // Spread effect (less sensitive) - move apart on screen
+        let spreadT = t / 2.0
         
         for (i, card) in cardViews.enumerated() {
-            card.center    = lerp(stackCenters[i],    spreadCenters[i],    t)
-            let baseTransform = lerpAffine(stackTransforms[i], spreadTransforms[i], t)
+            card.center    = lerp(stackCenters[i],    spreadCenters[i],    spreadT)
+            let baseTransform = lerpAffine(stackTransforms[i], spreadTransforms[i], spreadT)
             let rotationTransform = CGAffineTransform(rotationAngle: rotation)
-            let scaleTransform = CGAffineTransform(scaleX: inflateScale, y: inflateScale)
+            let scaleTransform = CGAffineTransform(scaleX: zoomScale, y: zoomScale)
             card.transform = rotationTransform.concatenating(scaleTransform).concatenating(baseTransform)
-            let clampedAlpha = min(1.0, stackAlphas[i] + (1 - stackAlphas[i]) * t)
+            let clampedAlpha = min(1.0, stackAlphas[i] + (1 - stackAlphas[i]) * spreadT)
             card.alpha     = clampedAlpha
         }
     }
@@ -358,7 +360,7 @@ final class PhotoStackView: UIView {
             activeOverlay = overlay
 
         case .changed:
-            let progress = (g.scale - 1.0) / 2.0
+            let progress = (g.scale - 1.0) * 1.5
             currentPinchProgress = progress
             activeOverlay?.updateProgressWithRotation(progress, rotation: currentRotation)
 
