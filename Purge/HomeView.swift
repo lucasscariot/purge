@@ -53,9 +53,6 @@ struct HomeView: View {
 } else {
                             photoStacksSection
                                 .padding(.top, 16)
-                            
-                            reviewPrompt
-                                .padding(.top, 24)
                         }
                         
                         Color.clear.frame(height: 120)
@@ -140,19 +137,20 @@ struct HomeView: View {
                 .padding(.horizontal, 24)
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+                LazyHStack(spacing: 16) {
                     ForEach(dayGroups.sorted(by: { $0.date > $1.date }).prefix(10)) { day in
                         photoStackItem(group: day)
                     }
                 }
                 .padding(.horizontal, 24)
             }
+            .scrollClipDisabled()
         }
     }
     
     private func photoStackItem(group: DayGroup) -> some View {
         PinchablePhotoStack(photos: group.photos, seed: group.id.hashValue) {}
-            .frame(width: 140, height: 140)
+            .frame(width: 130, height: 130)
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
     }
@@ -204,26 +202,6 @@ struct HomeView: View {
                 }
             }
         }
-    }
-    
-    // MARK: - Review Prompt
-    
-    private var reviewPrompt: some View {
-        Button(action: {
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            onStartReview?()
-        }) {
-            HStack {
-                Image(systemName: "hand.draw")
-                Text("Start Reviewing")
-                    .font(PurgeFont.ui(18, weight: .bold))
-            }
-            .foregroundStyle(Color.white)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(PurgeColor.mustard, in: RoundedRectangle(cornerRadius: 16))
-        }
-        .buttonStyle(ScrapbookButtonStyle())
     }
     
     // MARK: - Placeholders
