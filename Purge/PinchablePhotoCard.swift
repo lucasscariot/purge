@@ -80,6 +80,7 @@ struct PinchablePhotoCard: View {
                 .resizable()
                 .aspectRatio(contentMode: .fill)
                 .frame(width: startingFrame.width, height: startingFrame.height)
+                .clipShape(RoundedRectangle(cornerRadius: 12 / currentScale))
                 .clipped()
                 .scaleEffect(currentScale)
                 .position(x: lastCenterPoint.x, y: lastCenterPoint.y)
@@ -99,7 +100,7 @@ struct PinchablePhotoCard: View {
                 isZooming = true
                 onZoomChanged?(true)
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    backgroundOpacity = 1.0
+                    backgroundOpacity = 0.5
                 }
             }
         }
