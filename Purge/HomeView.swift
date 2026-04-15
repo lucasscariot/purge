@@ -439,7 +439,7 @@ struct HomeView: View {
                     .foregroundStyle(PurgeColor.text)
                 
                 if group.nearDuplicateCount > 0 {
-                    Text("\(group.nearDuplicateCount) near-dups")
+                    Text(String(format: NSLocalizedString("homeview_near_dups", comment: ""), group.nearDuplicateCount))
                         .font(PurgeFont.ui(11, weight: .bold))
                         .foregroundStyle(PurgeColor.rose)
                         .padding(.horizontal, 8)
