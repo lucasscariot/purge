@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import Pow
 import UIKit
+import Combine
 @preconcurrency import Photos
 
 struct ScrollViewContentHeightKey: PreferenceKey {
@@ -192,7 +193,7 @@ struct HomeView: View {
     private var screenHeight: CGFloat {
         let scenes = UIApplication.shared.connectedScenes
         let windowScene = scenes.first as? UIWindowScene
-        return windowScene?.windows.first?.bounds.height ?? UIScreen.main.bounds.height
+        return windowScene?.windows.first?.bounds.height ?? windowScene?.screen.bounds.height ?? 852
     }
     
     // MARK: - Hero
