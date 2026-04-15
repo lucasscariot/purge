@@ -136,7 +136,7 @@ struct DayDetailOverlay: View {
                         VStack(spacing: 12) {
                             Text(formattedDate(dayGroup.date))
                                 .font(.system(size: 18, weight: .medium, design: .rounded))
-                                .foregroundStyle(.white.opacity(0.8))
+                                .foregroundStyle(.primary)
                             
                             HStack(spacing: 16) {
                                 Button(action: selectAll) {
@@ -144,8 +144,7 @@ struct DayDetailOverlay: View {
                                         .font(.system(size: 14, weight: .semibold))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
-                                        .background(RoundedRectangle(cornerRadius: 16).fill(isAllSelected ? Color.red.opacity(0.8) : .white.opacity(0.2)))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(isAllSelected ? .primary : .red)
                                 }
                                 
                                 if hasNearDuplicates {
@@ -157,8 +156,7 @@ struct DayDetailOverlay: View {
                                         .font(.system(size: 14, weight: .semibold))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
-                                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.blue.opacity(0.8)))
-                                        .foregroundStyle(.white)
+                                        .foregroundStyle(.blue)
                                     }
                                 }
                             }
@@ -176,16 +174,15 @@ struct DayDetailOverlay: View {
                                                 .foregroundStyle(.orange)
                                             Text("daydetailoverlay_similar_photos")
                                                 .font(.system(size: 15, weight: .semibold))
-                                                .foregroundStyle(.white)
+                                                .foregroundStyle(.primary)
                                             Spacer()
                                             Button(action: { selectGroup(group.photos) }) {
                                                 let selected = isGroupSelected(group.photos)
                                                     Text(selected ? NSLocalizedString("daydetailoverlay_unselect_group", comment: "") : NSLocalizedString("daydetailoverlay_select_group", comment: ""))
                                                     .font(.system(size: 13, weight: .semibold))
-                                                    .foregroundStyle(selected ? .white : .red)
+                                                    .foregroundStyle(selected ? .primary : .red)
                                                     .padding(.horizontal, 10)
                                                     .padding(.vertical, 4)
-                                                    .background(RoundedRectangle(cornerRadius: 12).fill(selected ? Color.red.opacity(0.8) : Color.red.opacity(0.15)))
                                             }
                                         }
                                         .padding(.horizontal, 16)
