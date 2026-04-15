@@ -48,4 +48,9 @@
 "homeview_greetings_afternoon" = "Bon après-midi, Après-midi, Hey, Quoi de neuf, Coucou, Salut, Bonjour";
 "homeview_greetings_evening" = "Bonsoir, Soirée, Hey, Quoi de neuf, Coucou, Salut";
 "homeview_greeting_format" = "%@, %@";
-"homeview_greeting_format_question" = "%@, %@ ?";
+"homeview_greeting_format_question" = "%@, %@ ?";"daydetailoverlay_select_all" = "Tout sélectionner";
+"daydetailoverlay_unselect_all" = "Tout désélectionner";
+"daydetailoverlay_select_group" = "Sélectionner le groupe";
+"daydetailoverlay_unselect_group" = "Désélectionner le groupe";
+"daydetailoverlay_remove" = "Supprimer";
+"daydetailoverlay_remove_count" = "Supprimer (%lld)";

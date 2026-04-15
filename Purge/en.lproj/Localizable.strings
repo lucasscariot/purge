@@ -49,3 +49,9 @@
 "homeview_greetings_evening" = "Good evening, Evening, Hey, What's up, Bonsoir, Hello, Aloha";
 "homeview_greeting_format" = "%@, %@";
 "homeview_greeting_format_question" = "%@, %@?";
+"daydetailoverlay_select_all" = "Select All";
+"daydetailoverlay_unselect_all" = "Unselect All";
+"daydetailoverlay_select_group" = "Select Group";
+"daydetailoverlay_unselect_group" = "Unselect Group";
+"daydetailoverlay_remove" = "Remove";
+"daydetailoverlay_remove_count" = "Remove (%lld)";

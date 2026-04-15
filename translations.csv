@@ -51,3 +51,9 @@ homeview_greetings_afternoon,"Good afternoon, Afternoon, Hey, What's up, Howdy, 
 homeview_greetings_evening,"Good evening, Evening, Hey, What's up, Bonsoir, Hello, Aloha",
 homeview_greeting_format,"%@, %@",
 homeview_greeting_format_question,"%@, %@?",
+daydetailoverlay_select_all,Select All,Tout sélectionner
+daydetailoverlay_unselect_all,Unselect All,Tout désélectionner
+daydetailoverlay_select_group,Select Group,Sélectionner le groupe
+daydetailoverlay_unselect_group,Unselect Group,Désélectionner le groupe
+daydetailoverlay_remove,Remove,Supprimer
+daydetailoverlay_remove_count,Remove (%lld),Supprimer (%lld)

@@ -140,7 +140,7 @@ struct DayDetailOverlay: View {
                             
                             HStack(spacing: 16) {
                                 Button(action: selectAll) {
-                                    Text(isAllSelected ? "Unselect All" : "Select All")
+                                        Text(isAllSelected ? NSLocalizedString("daydetailoverlay_unselect_all", comment: "") : NSLocalizedString("daydetailoverlay_select_all", comment: ""))
                                         .font(.system(size: 14, weight: .semibold))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
@@ -180,7 +180,7 @@ struct DayDetailOverlay: View {
                                             Spacer()
                                             Button(action: { selectGroup(group.photos) }) {
                                                 let selected = isGroupSelected(group.photos)
-                                                Text(selected ? "Unselect Group" : "Select Group")
+                                                    Text(selected ? NSLocalizedString("daydetailoverlay_unselect_group", comment: "") : NSLocalizedString("daydetailoverlay_select_group", comment: ""))
                                                     .font(.system(size: 13, weight: .semibold))
                                                     .foregroundStyle(selected ? .white : .red)
                                                     .padding(.horizontal, 10)
@@ -307,7 +307,7 @@ struct DayDetailOverlay: View {
             Button(action: removeSelectedPhotos) {
                 HStack(spacing: 6) {
                     Image(systemName: "trash.fill")
-                    Text("Remove\(selectedPhotos.isEmpty || !isSelectionMode ? "" : " (\(selectedPhotos.count))")")
+                    Text(selectedPhotos.isEmpty || !isSelectionMode ? NSLocalizedString("daydetailoverlay_remove", comment: "") : String(format: NSLocalizedString("daydetailoverlay_remove_count", comment: ""), selectedPhotos.count))
                 }
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(.primary)
