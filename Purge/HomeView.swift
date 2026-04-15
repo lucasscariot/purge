@@ -132,7 +132,7 @@ struct HomeView: View {
                         )
                     }
                     
-                    if !dayGroups.isEmpty && groupedPreviousDays.count > 1 {
+                    if selectedDayGroup == nil && !dayGroups.isEmpty && groupedPreviousDays.count > 1 {
                         HStack(alignment: .top) {
                             Spacer()
                             TimelineScrubber(
