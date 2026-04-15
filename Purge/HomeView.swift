@@ -134,6 +134,7 @@ struct HomeView: View {
                             )
                         }
                     }
+                    .scrollDisabled(scanProgress != nil)
                     .onPreferenceChange(ScrollViewContentHeightKey.self) { height in
                         let roundedHeight = round(height)
                         if abs(contentHeight - roundedHeight) > 1.0 {
@@ -557,10 +558,18 @@ struct HomeView: View {
             ))
             
             if let pps = currentPPS, pps > 0 {
-                Text(String(format: "Dev Mode: %.1f photos/sec", pps))
-                    .font(PurgeFont.mono(12))
-                    .foregroundStyle(PurgeColor.primary)
-                    .padding(.top, 8)
+                HStack(spacing: 6) {
+                    Image(systemName: "bolt.fill")
+                        .foregroundStyle(PurgeColor.mustard)
+                    Text("Scanning \(Int(pps)) photos per second")
+                        .font(PurgeFont.ui(14, weight: .bold))
+                        .foregroundStyle(PurgeColor.textMuted)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(PurgeColor.textMuted.opacity(0.1))
+                .clipShape(Capsule())
+                .padding(.top, 16)
             }
         }
         .frame(maxWidth: .infinity)
