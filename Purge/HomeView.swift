@@ -568,7 +568,7 @@ struct HomeView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "bolt.fill")
                         .foregroundStyle(PurgeColor.mustard)
-                    Text("Scanning \(Int(pps)) photos per second")
+                    Text(String(format: NSLocalizedString("homeview_scanning_speed", comment: ""), Int(pps)))
                         .font(PurgeFont.ui(14, weight: .bold))
                         .foregroundStyle(PurgeColor.textMuted)
                 }
