@@ -149,7 +149,11 @@ final class PhotoStackOverlayView: UIView {
                         ImageCache.shared.requestImage(
                             for: asset, targetSize: CGSize(width: 320, height: 320)
                         ) { [weak iv] img in
-                            DispatchQueue.main.async { iv?.image = img }
+                            DispatchQueue.main.async {
+                                if let img = img {
+                                    iv?.image = img
+                                }
+                            }
                         }
                     }
                 }
@@ -266,6 +270,7 @@ final class PhotoStackView: UIView {
 
     func update(photos: [DummyPhoto]) {
         guard photos.map(\.id) != self.photos.map(\.id) else { return }
+        print("[PinchablePhotoStack] Rebuilding stack because IDs changed")
         self.photos = photos
         cardViews.forEach { $0.removeFromSuperview() }
         cardViews.removeAll()
@@ -321,7 +326,11 @@ final class PhotoStackView: UIView {
                         ImageCache.shared.requestImage(
                             for: asset, targetSize: CGSize(width: 256, height: 256)
                         ) { [weak iv] img in
-                            DispatchQueue.main.async { iv?.image = img }
+                            DispatchQueue.main.async {
+                                if let img = img {
+                                    iv?.image = img
+                                }
+                            }
                         }
                     }
                 }
