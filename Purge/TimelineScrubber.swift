@@ -119,6 +119,6 @@ struct TimelineScrubber: View {
                 }
             }
         }
-        .frame(width: 60)
+        .frame(width: 30)
     }
 }
