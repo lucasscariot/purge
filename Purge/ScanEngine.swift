@@ -677,7 +677,7 @@ final class ScanEngine {
             guard let meta = metaMap[id] else { return nil }
             return DummyPhoto(
                 localIdentifier: id,
-                color: Color(hex: "1E1E1E"),
+                color: Color(hex: "EFECE8"),
                 label: "PHOTO",
                 date: meta.date.map { Self.shortDateFormatter.string(from: $0).uppercased() } ?? "",
                 sizeMB: Int(meta.estimatedFileSize / 1_000_000)
@@ -701,7 +701,7 @@ final class ScanEngine {
             guard let meta = metaMap[id] else { return nil }
             return DummyPhoto(
                 localIdentifier: id,
-                color: Color(hex: "1E1E1E"),
+                color: Color(hex: "EFECE8"),
                 label: "PHOTO",
                 date: meta.date.map { Self.shortDateFormatter.string(from: $0).uppercased() } ?? "",
                 sizeMB: Int(meta.estimatedFileSize / 1_000_000)
@@ -725,7 +725,7 @@ final class ScanEngine {
             guard let asset = assetMap[id] else { return nil }
             return DummyPhoto(
                 localIdentifier: id,
-                color: Color(hex: "1E1E1E"),
+                color: Color(hex: "EFECE8"),
                 label: "PHOTO",
                 date: asset.creationDate.map { Self.shortDateFormatter.string(from: $0).uppercased() } ?? "",
                 sizeMB: Int(asset.fileSize / 1_000_000)

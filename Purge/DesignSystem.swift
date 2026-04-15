@@ -10,7 +10,7 @@ import UIKit
 
 enum PurgeColor {
     // Base
-    static let background = Color(hex: "FAF8F5")   // cream paper
+    static let background = Color(hex: "FCFCFA")   // off-white paper, less yellow
     static let surface    = Color(hex: "FFFFFF")   // white card surface
     static let text       = Color(hex: "2D2B2A")   // charcoal (never pure black)
     static let textMuted  = Color(hex: "8C8A88")   // muted grey
@@ -250,16 +250,22 @@ struct AsyncPhotoImage: View {
             .firstObject
         else { return }
 
-self.image = await withTaskCancellationHandler {
-            await withCheckedContinuation { continuation in
-                ImageCache.shared.requestImage(for: asset, targetSize: targetSize, ignoreDegraded: true) { image in
-                    continuation.resume(returning: image)
+        let stream = AsyncStream<UIImage?> { continuation in
+            continuation.onTermination = { _ in
+                Task { @MainActor in
+                    ImageCache.shared.cancelRequest(for: localIdentifier)
                 }
             }
-        } onCancel: {
-            Task { @MainActor in
-                ImageCache.shared.cancelRequest(for: localIdentifier)
+            ImageCache.shared.requestImage(for: asset, targetSize: targetSize, ignoreDegraded: false) { image in
+                continuation.yield(image)
             }
+        }
+
+        for await img in stream {
+            if let img = img {
+                self.image = img
+            }
+            if Task.isCancelled { break }
         }
     }
 }
@@ -269,7 +275,7 @@ self.image = await withTaskCancellationHandler {
 struct DotGridBackground: View {
     var dotSize: CGFloat = 3
     var dotSpacing: CGFloat = 28
-    var dotColor: Color = Color(hex: "E5E3E0").opacity(0.6)
+    var dotColor: Color = Color(hex: "D5D3CF").opacity(0.8)
     
     var body: some View {
         Canvas { context, size in

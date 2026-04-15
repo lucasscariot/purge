@@ -31,11 +31,13 @@ struct HomeView: View {
         "captain", "maestro", "hotshot", "maverick", "tiger",
         "wizard", "ninja", "guru", "star", "darling",
         "sweetie", "honey", "pumpkin", "buttercup", "cupcake",
-        "muffin", "peanut", "bean", "nugget", "sprout",
+        "muffin", "peanut", "bean", "nugget", "🥦",
         "firecracker", "sparky", "wildcat", "troublemaker", "rebel",
         "outlaw", "bandit", "rascal", "scamp", "sport",
         "pal", "mate", "amigo", "bossman", "bosslady",
-        "detective", "sleuth", "purger", "cleaner", "magician"
+        "detective", "sleuth", "purger", "cleaner", "magician",
+        "goblin", "gremlin", "bat", "vampire", "sleepwalker",
+        "phantom", "ghost", "owl", "zombie", "dreamer", "👾", "👽"
     ].randomElement() ?? "friend"
 
     private var totalMemorySaved: Int64 {
@@ -56,13 +58,26 @@ struct HomeView: View {
 
     private var greeting: String {
         let hour = Calendar.current.component(.hour, from: Date())
-        let timeGreeting: String
-        switch hour {
-        case 0..<12: timeGreeting = "Good morning"
-        case 12..<17: timeGreeting = "Good afternoon"
-        default: timeGreeting = "Good evening"
+        
+        if hour >= 0 && hour < 5 || hour >= 23 {
+            let nightGreetings = ["Insomnia", "Up late", "Night owl", "Still awake"]
+            let prefix = nightGreetings.randomElement() ?? "Insomnia"
+            return "\(prefix), \(funName)?"
         }
-        return "\(timeGreeting), \(funName)"
+        
+        let timeGreetings: [String]
+        switch hour {
+        case 5..<12:
+            timeGreetings = ["Good morning", "Rise and shine", "Morning", "Bonjour", "Hey", "What's up", "Top of the morning"]
+        case 12..<17:
+            timeGreetings = ["Good afternoon", "Afternoon", "Hey", "What's up", "Howdy", "Hello", "Hola", "Bonjour"]
+        default:
+            timeGreetings = ["Good evening", "Evening", "Hey", "What's up", "Bonsoir", "Hello", "Aloha"]
+        }
+        
+        let prefix = timeGreetings.randomElement() ?? "Hello"
+        let punctuation = (prefix == "What's up") ? "?" : ""
+        return "\(prefix), \(funName)\(punctuation)"
     }
     
     var body: some View {
@@ -217,17 +232,39 @@ struct HomeView: View {
                     .opacity(isAppeared ? 1 : 0)
                     .offset(y: isAppeared ? 0 : 15)
                 
-                Text("Your Scrapbook")
+                Text("Your Library")
                     .font(PurgeFont.display(42, weight: .bold))
                     .foregroundStyle(PurgeColor.text)
                     .opacity(isAppeared ? 1 : 0)
                     .offset(y: isAppeared ? 0 : 15)
                 
-                Text("\(formatted(dynamicPhotoCount)) photos waiting to be organized")
-                    .font(PurgeFont.ui(16, weight: .medium))
-                    .foregroundStyle(PurgeColor.textMuted)
-                    .opacity(isAppeared ? 1 : 0)
-                    .offset(y: isAppeared ? 0 : 15)
+                HStack(spacing: 8) {
+                    Image(systemName: "photo.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(PurgeColor.mustard)
+                    
+                    HStack(spacing: 4) {
+                        Text("\(formatted(dynamicPhotoCount))")
+                            .foregroundStyle(PurgeColor.text)
+                            .font(PurgeFont.ui(14, weight: .bold))
+                        
+                        Text("photos waiting")
+                            .foregroundStyle(PurgeColor.textMuted)
+                            .font(PurgeFont.ui(14, weight: .medium))
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial)
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.5)
+                )
+                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
+                .opacity(isAppeared ? 1 : 0)
+                .offset(y: isAppeared ? 0 : 15)
+                .padding(.top, 4)
             }
         }
         .padding(.horizontal, 24)
@@ -467,7 +504,7 @@ struct HomeView: View {
             Image(systemName: "photo.on.rectangle.angled")
                 .font(.system(size: 48, weight: .light))
                 .foregroundStyle(PurgeColor.textMuted.opacity(0.5))
-            Text("Your scrapbook is empty")
+            Text("Your library is empty")
                 .font(PurgeFont.display(24, weight: .bold))
                 .foregroundStyle(PurgeColor.text)
             Text("Tap the rescan button to find photos.")
