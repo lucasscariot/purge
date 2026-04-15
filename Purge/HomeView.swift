@@ -118,8 +118,9 @@ struct HomeView: View {
                         }
                     }
                     .onPreferenceChange(ScrollViewContentHeightKey.self) { height in
-                        DispatchQueue.main.async {
-                            contentHeight = height
+                        let roundedHeight = round(height)
+                        if abs(contentHeight - roundedHeight) > 1.0 {
+                            contentHeight = roundedHeight
                         }
                     }
                     .scrollIndicators(.hidden)
