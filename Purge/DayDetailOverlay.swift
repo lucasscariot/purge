@@ -136,7 +136,7 @@ struct DayDetailOverlay: View {
                         VStack(spacing: 12) {
                             Text(formattedDate(dayGroup.date))
                                 .font(.system(size: 18, weight: .medium, design: .rounded))
-                                .foregroundStyle(.primary)
+                                .foregroundStyle(.primary.opacity(0.8))
                             
                             HStack(spacing: 16) {
                                 Button(action: selectAll) {
@@ -145,7 +145,7 @@ struct DayDetailOverlay: View {
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
                                         .background(RoundedRectangle(cornerRadius: 16).fill(isAllSelected ? Color.red.opacity(0.8) : .gray.opacity(0.15)))
-                                        .foregroundStyle(isAllSelected ? Color.white : Color.primary)
+                                        .foregroundStyle(isAllSelected ? Color.white : Color.primary.opacity(0.85))
                                 }
                                 
                                 if hasNearDuplicates {
@@ -176,7 +176,7 @@ struct DayDetailOverlay: View {
                                                 .foregroundStyle(.orange)
                                             Text("daydetailoverlay_similar_photos")
                                                 .font(.system(size: 15, weight: .semibold))
-                                                .foregroundStyle(.primary)
+                                                .foregroundStyle(.primary.opacity(0.8))
                                             Spacer()
                                             Button(action: { selectGroup(group.photos) }) {
                                                 let selected = isGroupSelected(group.photos)
@@ -310,7 +310,7 @@ struct DayDetailOverlay: View {
                     Text(selectedPhotos.isEmpty || !isSelectionMode ? NSLocalizedString("daydetailoverlay_remove", comment: "") : String(format: NSLocalizedString("daydetailoverlay_remove_count", comment: ""), selectedPhotos.count))
                 }
                 .font(.system(size: 17, weight: .semibold))
-                .foregroundStyle(.primary)
+                .foregroundStyle(.primary.opacity(0.85))
                 .frame(width: 150, height: 44)
                 .padding(.horizontal, 16)
                 .background(
@@ -353,7 +353,7 @@ struct DayDetailOverlay: View {
                 Text("daydetailoverlay_close")
                     .font(.system(size: 17, weight: .semibold))
             }
-            .foregroundStyle(.primary)
+            .foregroundStyle(.primary.opacity(0.85))
             .frame(width: 120, height: 44)
             .background(
                 RoundedRectangle(cornerRadius: 22)
