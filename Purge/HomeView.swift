@@ -26,20 +26,7 @@ struct HomeView: View {
     @State private var selectedDayGroup: DayGroup?
     @State private var isAppeared = false
     @State private var contentHeight: CGFloat = 0
-    @State private var funName: String = [
-        "sunshine", "hero", "smart-ass", "rockstar", "legend",
-        "champ", "superstar", "genius", "boss", "chief",
-        "captain", "maestro", "hotshot", "maverick", "tiger",
-        "wizard", "ninja", "guru", "star", "darling",
-        "sweetie", "honey", "pumpkin", "buttercup", "cupcake",
-        "muffin", "peanut", "bean", "nugget", "🥦",
-        "firecracker", "sparky", "wildcat", "troublemaker", "rebel",
-        "outlaw", "bandit", "rascal", "scamp", "sport",
-        "pal", "mate", "amigo", "bossman", "bosslady",
-        "detective", "sleuth", "purger", "cleaner", "magician",
-        "goblin", "gremlin", "bat", "vampire", "sleepwalker",
-        "phantom", "ghost", "owl", "zombie", "dreamer", "👾", "👽"
-    ].randomElement() ?? "friend"
+    @State private var funName: String = ""
 
     private var totalMemorySaved: Int64 {
         memorySavedRecords.first?.totalBytesSaved ?? 0
@@ -69,32 +56,50 @@ struct HomeView: View {
 
     private var greeting: String {
         if !generatedGreeting.isEmpty { return generatedGreeting }
-        return "Hello, \(funName)"
+        return String(format: NSLocalizedString("homeview_greeting_format", comment: ""), "Hello", funName.isEmpty ? "friend" : funName)
     }
     
     private func generateGreeting() {
+        if funName.isEmpty {
+            let namesStr = NSLocalizedString("homeview_fun_names", comment: "")
+            let names = namesStr.components(separatedBy: ",")
+            funName = names.randomElement()?.trimmingCharacters(in: .whitespaces) ?? "friend"
+        }
+
         let hour = Calendar.current.component(.hour, from: Date())
+        let format = NSLocalizedString("homeview_greeting_format", comment: "")
         
         if hour >= 0 && hour < 5 || hour >= 23 {
-            let nightGreetings = ["Insomnia", "Up late", "Night owl", "Still awake"]
-            let prefix = nightGreetings.randomElement() ?? "Insomnia"
-            generatedGreeting = "\(prefix), \(funName)?"
+            let nightGreetingsStr = NSLocalizedString("homeview_greetings_night", comment: "")
+            let nightGreetings = nightGreetingsStr.components(separatedBy: ",")
+            let prefix = nightGreetings.randomElement()?.trimmingCharacters(in: .whitespaces) ?? "Insomnia"
+            
+            // For night greetings, the original code added a question mark.
+            let formatNight = NSLocalizedString("homeview_greeting_format_question", comment: "")
+            generatedGreeting = String(format: formatNight, prefix, funName)
             return
         }
         
-        let timeGreetings: [String]
+        let timeGreetingsStr: String
         switch hour {
         case 5..<12:
-            timeGreetings = ["Good morning", "Rise and shine", "Morning", "Bonjour", "Hey", "What's up", "Top of the morning"]
+            timeGreetingsStr = NSLocalizedString("homeview_greetings_morning", comment: "")
         case 12..<17:
-            timeGreetings = ["Good afternoon", "Afternoon", "Hey", "What's up", "Howdy", "Hello", "Hola", "Bonjour"]
+            timeGreetingsStr = NSLocalizedString("homeview_greetings_afternoon", comment: "")
         default:
-            timeGreetings = ["Good evening", "Evening", "Hey", "What's up", "Bonsoir", "Hello", "Aloha"]
+            timeGreetingsStr = NSLocalizedString("homeview_greetings_evening", comment: "")
         }
         
-        let prefix = timeGreetings.randomElement() ?? "Hello"
+        let timeGreetings = timeGreetingsStr.components(separatedBy: ",")
+        let prefix = timeGreetings.randomElement()?.trimmingCharacters(in: .whitespaces) ?? "Hello"
+        
         let punctuation = (prefix == "What's up") ? "?" : ""
-        generatedGreeting = "\(prefix), \(funName)\(punctuation)"
+        if punctuation == "?" {
+            let formatQuestion = NSLocalizedString("homeview_greeting_format_question", comment: "")
+            generatedGreeting = String(format: formatQuestion, prefix, funName)
+        } else {
+            generatedGreeting = String(format: format, prefix, funName)
+        }
     }
     
     var body: some View {
@@ -206,7 +211,7 @@ struct HomeView: View {
                 .foregroundStyle(PurgeColor.mustard)
             
             HStack(spacing: 4) {
-                Text("Saved")
+                Text("homeview_saved")
                     .foregroundStyle(PurgeColor.textMuted)
                 Text(formatBytes(totalMemorySaved))
                     .foregroundStyle(PurgeColor.text)
@@ -251,7 +256,7 @@ struct HomeView: View {
                     .opacity(isAppeared ? 1 : 0)
                     .offset(y: isAppeared ? 0 : 15)
                 
-                Text("Your Library")
+                Text("homeview_your_library")
                     .font(PurgeFont.display(42, weight: .bold))
                     .foregroundStyle(PurgeColor.text)
                     .opacity(isAppeared ? 1 : 0)
@@ -267,7 +272,7 @@ struct HomeView: View {
                             .foregroundStyle(PurgeColor.text)
                             .font(PurgeFont.ui(14, weight: .bold))
                         
-                        Text("photos waiting")
+                        Text("homeview_photos_waiting")
                             .foregroundStyle(PurgeColor.textMuted)
                             .font(PurgeFont.ui(14, weight: .medium))
                     }
@@ -341,7 +346,7 @@ struct HomeView: View {
         return Group {
             if !onThisDayGroups.isEmpty {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("On this day")
+                    Text("homeview_on_this_day")
                         .font(PurgeFont.display(24, weight: .bold))
                         .foregroundStyle(PurgeColor.text)
                         .padding(.horizontal, 24)
@@ -523,7 +528,7 @@ struct HomeView: View {
             }
             
             VStack(spacing: 8) {
-                Text("Gathering your memories...")
+                Text("homeview_gathering_your_memories")
                     .font(PurgeFont.ui(18, weight: .bold))
                     .foregroundStyle(PurgeColor.text)
                 
@@ -588,10 +593,10 @@ struct HomeView: View {
             Image(systemName: "photo.on.rectangle.angled")
                 .font(.system(size: 48, weight: .light))
                 .foregroundStyle(PurgeColor.textMuted.opacity(0.5))
-            Text("Your library is empty")
+            Text("homeview_your_library_is_empty")
                 .font(PurgeFont.display(24, weight: .bold))
                 .foregroundStyle(PurgeColor.text)
-            Text("Tap the rescan button to find photos.")
+            Text("homeview_tap_the_rescan_button_to_find_photos")
                 .font(PurgeFont.ui(16, weight: .medium))
                 .foregroundStyle(PurgeColor.textMuted)
         }

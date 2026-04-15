@@ -160,7 +160,7 @@ struct ContentRootView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
                     StatusDot(color: PurgeColor.primary, size: 8)
-                    Text("PURGE")
+                    Text("purgeapp_purge")
                         .font(PurgeFont.mono(12, weight: .semibold))
                         .foregroundStyle(PurgeColor.text)
                     Spacer()
@@ -181,7 +181,7 @@ struct ContentRootView: View {
                     Text(message)
                         .font(PurgeFont.mono(11))
                         .foregroundStyle(PurgeColor.textMuted)
-                    Text("NOT_YOUR_PHOTOS_THOUGH — THOSE_ARE_STILL_A_MESS")
+                    Text("purgeapp_not_your_photos_though_those_are_still_a_mess")
                         .font(PurgeFont.mono(10))
                         .foregroundStyle(PurgeColor.textMuted)
                 }

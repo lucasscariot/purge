@@ -7,17 +7,23 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		39B89DB3AED8F81DC325826C /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = 591FD36362892CF538165094 /* Localizable.strings */; };
 		A05F8D862F8E4C9A00267AEB /* Pow in Frameworks */ = {isa = PBXBuildFile; productRef = A05F8D852F8E4C9A00267AEB /* Pow */; };
 		F1AA00012F8B900000000001 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = F1AA00002F8B900000000001 /* FirebaseAnalytics */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		A5AB72D32F8B84BB00374CCD /* Purge.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Purge.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A60CDA111875A135E7737B45 /* ru */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = ru; path = Purge/ru.lproj/Localizable.strings; sourceTree = "<group>"; };
+		AB8DD10577973DBCDC293194 /* en */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = en; path = Purge/en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		C79C854B9918D2505F16F586 /* fr */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.strings; name = fr; path = Purge/fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A5AB72D52F8B84BB00374CCD /* Purge */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Purge;
 			sourceTree = "<group>";
 		};
@@ -41,6 +47,7 @@
 			children = (
 				A5AB72D52F8B84BB00374CCD /* Purge */,
 				A5AB72D42F8B84BB00374CCD /* Products */,
+				591FD36362892CF538165094 /* Localizable.strings */,
 			);
 			sourceTree = "<group>";
 		};
@@ -100,6 +107,8 @@
 			knownRegions = (
 				en,
 				Base,
+				fr,
+				ru,
 			);
 			mainGroup = A5AB72CA2F8B84BB00374CCD;
 			minimizedProjectReferenceProxies = 1;
@@ -122,6 +131,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				39B89DB3AED8F81DC325826C /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -136,6 +146,19 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		591FD36362892CF538165094 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				AB8DD10577973DBCDC293194 /* en */,
+				C79C854B9918D2505F16F586 /* fr */,
+				A60CDA111875A135E7737B45 /* ru */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
 		A5AB72DE2F8B84BC00374CCD /* Debug */ = {

@@ -54,7 +54,7 @@ struct ImageZoomView: View {
                 if isAppearing && scale == 1.0 && offset == .zero && rotation == .zero {
                     VStack {
                         Spacer()
-                        Text("Pinch to zoom • Drag to pan • Rotate with two fingers")
+                        Text("imagezoomview_pinch_to_zoom_drag_to_pan_rotate_with_two_fingers")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundStyle(.white.opacity(0.7))
                             .padding(.bottom, 40)

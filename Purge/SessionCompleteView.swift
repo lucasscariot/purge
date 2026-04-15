@@ -18,11 +18,11 @@ struct SessionCompleteView: View {
                 // Header
                 HStack {
                     StatusDot(color: .white, size: 8)
-                    Text("PURGE")
+                    Text("sessioncompleteview_purge")
                         .font(PurgeFont.mono(12, weight: .semibold))
                         .foregroundStyle(.white)
                     Spacer()
-                    Text("SESSION_COMPLETE")
+                    Text("sessioncompleteview_session_complete")
                         .font(PurgeFont.mono(9))
                         .foregroundStyle(.white.opacity(0.6))
                 }
@@ -40,7 +40,7 @@ struct SessionCompleteView: View {
                     SectionTag(text: "CLEANUP_RESULT", color: .white.opacity(0.6))
                         .padding(.horizontal, 16)
 
-                    Text("OBLITERATED.")
+                    Text("sessioncompleteview_obliterated")
                         .font(PurgeFont.headline(68))
                         .foregroundStyle(.white)
                         .tracking(-2)
@@ -105,7 +105,7 @@ struct SessionCompleteView: View {
     private var actionButtons: some View {
         HStack(spacing: 1) {
             Button(action: onReviewTrash) {
-                Text("REVIEW_TRASH")
+                Text("sessioncompleteview_review_trash")
                     .font(PurgeFont.mono(11, weight: .semibold))
                     .foregroundStyle(PurgeColor.primary)
                     .frame(maxWidth: .infinity)
@@ -115,7 +115,7 @@ struct SessionCompleteView: View {
             .buttonStyle(.plain)
 
             Button(action: onDone) {
-                Text("DONE")
+                Text("sessioncompleteview_done")
                     .font(PurgeFont.mono(11, weight: .semibold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)

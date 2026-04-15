@@ -120,7 +120,7 @@ struct ReviewSessionView: View {
     private var header: some View {
         HStack {
             Button { dismiss() } label: {
-                Text("< BACK")
+                Text("reviewsessionview_back")
                     .font(PurgeFont.mono(11, weight: .semibold))
                     .foregroundStyle(PurgeColor.textMuted)
             }
@@ -150,7 +150,7 @@ struct ReviewSessionView: View {
     private var instructionBar: some View {
         HStack(spacing: 8) {
             StatusDot(color: PurgeColor.primary, size: 6)
-            Text("TAP TO MARK FOR DELETION")
+            Text("reviewsessionview_tap_to_mark_for_deletion")
                 .font(PurgeFont.mono(9, weight: .semibold))
                 .foregroundStyle(PurgeColor.textMuted)
             Spacer()
@@ -276,7 +276,7 @@ struct ReviewSessionView: View {
                             .foregroundStyle(PurgeColor.text)
                             .tracking(-1)
                     } else {
-                        Text("SKIP GROUP")
+                        Text("reviewsessionview_skip_group")
                             .font(PurgeFont.mono(13, weight: .semibold))
                             .foregroundStyle(PurgeColor.textMuted)
                     }

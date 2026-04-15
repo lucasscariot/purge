@@ -152,7 +152,7 @@ struct DayDetailOverlay: View {
                                     Button(action: applyAISelection) {
                                         HStack(spacing: 6) {
                                             Image(systemName: "wand.and.stars")
-                                            Text("AI Select")
+                                            Text("daydetailoverlay_ai_select")
                                         }
                                         .font(.system(size: 14, weight: .semibold))
                                         .padding(.horizontal, 16)
@@ -174,7 +174,7 @@ struct DayDetailOverlay: View {
                                         HStack {
                                             Image(systemName: "rectangle.stack.fill")
                                                 .foregroundStyle(.orange)
-                                            Text("Similar Photos")
+                                            Text("daydetailoverlay_similar_photos")
                                                 .font(.system(size: 15, weight: .semibold))
                                                 .foregroundStyle(.white)
                                             Spacer()
@@ -350,7 +350,7 @@ struct DayDetailOverlay: View {
             HStack(spacing: 8) {
                 Image(systemName: "chevron.down")
                     .font(.system(size: 16, weight: .semibold))
-                Text("Close")
+                Text("daydetailoverlay_close")
                     .font(.system(size: 17, weight: .semibold))
             }
             .foregroundStyle(.primary)

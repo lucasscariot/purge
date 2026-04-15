@@ -14,11 +14,11 @@ struct ScanProgressView: View {
                 HStack(spacing: 8) {
                     StatusDot(color: PurgeColor.primary, size: 8)
                         .opacity(pulseOpacity)
-                    Text("PURGE")
+                    Text("scanprogressview_purge")
                         .font(PurgeFont.mono(12, weight: .semibold))
                         .foregroundStyle(PurgeColor.text)
                     Spacer()
-                    Text("SCANNING...")
+                    Text("scanprogressview_scanning")
                         .font(PurgeFont.mono(10))
                         .foregroundStyle(PurgeColor.primary)
                 }
@@ -51,7 +51,7 @@ struct ScanProgressView: View {
                             progressBar(current: current, total: total)
 
                             HStack {
-                                Text("PHOTOS_PROCESSED")
+                                Text("scanprogressview_photos_processed")
                                     .font(PurgeFont.mono(9, weight: .semibold))
                                     .foregroundStyle(PurgeColor.textMuted)
                                 Spacer()
@@ -68,7 +68,7 @@ struct ScanProgressView: View {
 
                             if duplicateCount > 0 {
                                 HStack {
-                                    Text("DUPLICATES_FOUND")
+                                    Text("scanprogressview_duplicates_found")
                                         .font(PurgeFont.mono(9, weight: .semibold))
                                         .foregroundStyle(PurgeColor.textMuted)
                                     Spacer()

@@ -47,7 +47,7 @@ struct SwipeSessionView: View {
             Button {
                 dismiss()
             } label: {
-                Text("< BACK")
+                Text("swipesessionview_back")
                     .font(PurgeFont.mono(11, weight: .semibold))
                     .foregroundStyle(PurgeColor.textMuted)
             }
@@ -136,7 +136,7 @@ struct SwipeSessionView: View {
             Button {
                 undoLast()
             } label: {
-                Text("UNDO")
+                Text("swipesessionview_undo")
                     .font(PurgeFont.mono(11, weight: .semibold))
                     .foregroundStyle(decisions.isEmpty ? PurgeColor.textMuted : PurgeColor.textMuted)
                     .underline(!decisions.isEmpty)

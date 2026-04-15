@@ -56,7 +56,7 @@ struct DashboardView: View {
                     color: scanProgress != nil ? PurgeColor.warning : PurgeColor.primary,
                     size: 8
                 )
-                Text(scanProgress != nil ? "SCANNING" : "PURGE")
+                Text(scanProgress != nil ? "dashboard_header_scanning" : "dashboard_header_purge")
                     .font(PurgeFont.mono(13, weight: .semibold))
                     .foregroundStyle(PurgeColor.text)
                 if let p = scanProgress {
@@ -179,7 +179,7 @@ struct DashboardView: View {
 
                 Spacer()
 
-                Text("START PURGE")
+                Text("dashboardview_start_purge")
                     .font(PurgeFont.headline(40))
                     .foregroundStyle(PurgeColor.text)
                     .tracking(-1)
@@ -209,7 +209,7 @@ struct DashboardView: View {
             // Section header
             HStack(spacing: 8) {
                 StatusDot(color: PurgeColor.primary, size: 6)
-                Text("CLEANUP_QUEUE")
+                Text("dashboardview_cleanup_queue")
                     .font(PurgeFont.mono(10, weight: .semibold))
                     .foregroundStyle(PurgeColor.textMuted)
                 Spacer()
@@ -293,10 +293,10 @@ struct DashboardView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("NOTHING_LEFT_TO_PURGE")
+            Text("dashboardview_nothing_left_to_purge")
                 .font(PurgeFont.mono(12, weight: .semibold))
                 .foregroundStyle(PurgeColor.text)
-            Text("Your gallery is clean. For now.")
+            Text("dashboardview_your_gallery_is_clean_for_now")
                 .font(PurgeFont.mono(11))
                 .foregroundStyle(PurgeColor.textMuted)
         }
@@ -310,8 +310,8 @@ struct DashboardView: View {
 
     private var bottomActions: some View {
         HStack(spacing: 1) {
-            actionButton("RESCAN", action: onRescan)
-            actionButton("SETTINGS", action: {})
+            actionButton("dashboardview_rescan", action: onRescan)
+            actionButton("dashboardview_settings", action: {})
         }
         .overlay(Rectangle().strokeBorder(PurgeColor.border, lineWidth: 1))
     }
