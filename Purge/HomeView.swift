@@ -56,13 +56,29 @@ struct HomeView: View {
         scanEngine.photoCount
     }
 
+    @State private var generatedGreeting: String = ""
+    @State private var currentTipIndex = 0
+
+    private let loadingTips = [
+        ("lock.shield.fill", "100% Private", "Your photos never leave your device. All scanning happens locally."),
+        ("rectangle.on.rectangle.angled", "Finding Duplicates", "We group similar photos together so you can keep the best ones."),
+        ("hand.draw.fill", "Pinch to Zoom", "You can pinch any photo stack to get a closer look before purging."),
+        ("sparkles", "Smart Organization", "We scan for receipts, screenshots, and blurry shots too.")
+    ]
+
     private var greeting: String {
+        if !generatedGreeting.isEmpty { return generatedGreeting }
+        return "Hello, \(funName)"
+    }
+    
+    private func generateGreeting() {
         let hour = Calendar.current.component(.hour, from: Date())
         
         if hour >= 0 && hour < 5 || hour >= 23 {
             let nightGreetings = ["Insomnia", "Up late", "Night owl", "Still awake"]
             let prefix = nightGreetings.randomElement() ?? "Insomnia"
-            return "\(prefix), \(funName)?"
+            generatedGreeting = "\(prefix), \(funName)?"
+            return
         }
         
         let timeGreetings: [String]
@@ -77,7 +93,7 @@ struct HomeView: View {
         
         let prefix = timeGreetings.randomElement() ?? "Hello"
         let punctuation = (prefix == "What's up") ? "?" : ""
-        return "\(prefix), \(funName)\(punctuation)"
+        generatedGreeting = "\(prefix), \(funName)\(punctuation)"
     }
     
     var body: some View {
@@ -87,11 +103,11 @@ struct HomeView: View {
                     PurgeColor.background
                         .ignoresSafeArea()
                     
+                    DotGridBackground()
+                        .ignoresSafeArea()
+                    
                     ScrollView(.vertical, showsIndicators: false) {
                         ZStack(alignment: .topLeading) {
-                            DotGridBackground()
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                                .offset(y: -topSafeArea)
                             
                             VStack(spacing: 24) {
                                 Color.clear.frame(height: topSafeArea)
@@ -271,6 +287,9 @@ struct HomeView: View {
         .padding(.horizontal, 24)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
+            if generatedGreeting.isEmpty {
+                generateGreeting()
+            }
             withAnimation(.spring(response: 0.7, dampingFraction: 0.8).delay(0.1)) {
                 isAppeared = true
             }
@@ -482,12 +501,59 @@ struct HomeView: View {
     // MARK: - Placeholders
     
     private var scanningState: some View {
-        VStack(spacing: 16) {
-            ProgressView().tint(PurgeColor.mustard)
-                .scaleEffect(1.5)
-            Text("Gathering your memories...")
-                .font(PurgeFont.ui(16, weight: .bold))
-                .foregroundStyle(PurgeColor.textMuted)
+        VStack(spacing: 32) {
+            ZStack {
+                Circle()
+                    .stroke(PurgeColor.textMuted.opacity(0.2), lineWidth: 8)
+                    .frame(width: 64, height: 64)
+                
+                if let progress = scanProgress {
+                    Circle()
+                        .trim(from: 0.0, to: CGFloat(progress))
+                        .stroke(PurgeColor.mustard, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .frame(width: 64, height: 64)
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear(duration: 0.2), value: progress)
+                } else {
+                    ProgressView().tint(PurgeColor.mustard)
+                        .scaleEffect(1.5)
+                }
+            }
+            
+            VStack(spacing: 8) {
+                Text("Gathering your memories...")
+                    .font(PurgeFont.ui(18, weight: .bold))
+                    .foregroundStyle(PurgeColor.text)
+                
+                if let progress = scanProgress {
+                    Text("\(Int(progress * 100))% complete")
+                        .font(PurgeFont.ui(14, weight: .medium))
+                        .foregroundStyle(PurgeColor.textMuted)
+                }
+            }
+            
+            let tip = loadingTips[currentTipIndex]
+            VStack(spacing: 12) {
+                Image(systemName: tip.0)
+                    .font(.system(size: 24, weight: .light))
+                    .foregroundStyle(PurgeColor.mustard)
+                
+                Text(tip.1)
+                    .font(PurgeFont.ui(16, weight: .bold))
+                    .foregroundStyle(PurgeColor.text)
+                
+                Text(tip.2)
+                    .font(PurgeFont.ui(14, weight: .medium))
+                    .foregroundStyle(PurgeColor.textMuted)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 48)
+            }
+            .padding(.top, 16)
+            .id(currentTipIndex)
+            .transition(.asymmetric(
+                insertion: .opacity.combined(with: .move(edge: .bottom).animation(.spring(response: 0.5, dampingFraction: 0.8))),
+                removal: .opacity.combined(with: .move(edge: .top).animation(.spring(response: 0.5, dampingFraction: 0.8)))
+            ))
             
             if let pps = currentPPS, pps > 0 {
                 Text(String(format: "Dev Mode: %.1f photos/sec", pps))
@@ -498,6 +564,13 @@ struct HomeView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 80)
+        .onReceive(Timer.publish(every: 3.5, on: .main, in: .common).autoconnect()) { _ in
+            if scanProgress != nil {
+                withAnimation {
+                    currentTipIndex = (currentTipIndex + 1) % loadingTips.count
+                }
+            }
+        }
     }
 
     private var emptyState: some View {
