@@ -47,12 +47,14 @@ struct HomeView: View {
     @State private var generatedGreeting: String = ""
     @State private var currentTipIndex = 0
 
-    private let loadingTips = [
-        ("lock.shield.fill", "100% Private", "Your photos never leave your device. All scanning happens locally."),
-        ("rectangle.on.rectangle.angled", "Finding Duplicates", "We group similar photos together so you can keep the best ones."),
-        ("hand.draw.fill", "Pinch to Zoom", "You can pinch any photo stack to get a closer look before purging."),
-        ("sparkles", "Smart Organization", "We scan for receipts, screenshots, and blurry shots too.")
-    ]
+    private var loadingTips: [(String, String, String)] {
+        [
+            ("lock.shield.fill", NSLocalizedString("homeview_tip_private_title", comment: ""), NSLocalizedString("homeview_tip_private_desc", comment: "")),
+            ("rectangle.on.rectangle.angled", NSLocalizedString("homeview_tip_duplicates_title", comment: ""), NSLocalizedString("homeview_tip_duplicates_desc", comment: "")),
+            ("hand.draw.fill", NSLocalizedString("homeview_tip_zoom_title", comment: ""), NSLocalizedString("homeview_tip_zoom_desc", comment: "")),
+            ("sparkles", NSLocalizedString("homeview_tip_smart_title", comment: ""), NSLocalizedString("homeview_tip_smart_desc", comment: ""))
+        ]
+    }
 
     private var greeting: String {
         if !generatedGreeting.isEmpty { return generatedGreeting }

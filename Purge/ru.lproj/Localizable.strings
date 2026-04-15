@@ -56,3 +56,11 @@
 "daydetailoverlay_unselect_group" = "Отменить выбор группы";
 "daydetailoverlay_remove" = "Удалить";
 "daydetailoverlay_remove_count" = "Удалить (%lld)";
+"homeview_tip_private_title" = "100% Конфиденциально";
+"homeview_tip_private_desc" = "Ваши фото не покидают устройство. Всё сканирование происходит локально.";
+"homeview_tip_duplicates_title" = "Поиск дубликатов";
+"homeview_tip_duplicates_desc" = "Мы группируем похожие фото, чтобы вы могли оставить лучшие.";
+"homeview_tip_zoom_title" = "Масштабирование";
+"homeview_tip_zoom_desc" = "Сведите пальцы на стопке фото, чтобы рассмотреть их поближе перед удалением.";
+"homeview_tip_smart_title" = "Умная организация";
+"homeview_tip_smart_desc" = "Мы также находим чеки, скриншоты и размытые снимки.";
