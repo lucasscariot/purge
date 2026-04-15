@@ -225,7 +225,7 @@ struct HomeView: View {
                     .frame(width: 3, height: 3)
                     .foregroundStyle(PurgeColor.textMuted.opacity(0.5))
                 
-                Text("\(totalPhotosRemoved) removed")
+                            Text(String(format: NSLocalizedString("homeview_photos_removed", comment: ""), totalPhotosRemoved))
                     .font(PurgeFont.ui(14, weight: .medium))
                     .foregroundStyle(PurgeColor.textMuted)
             }
