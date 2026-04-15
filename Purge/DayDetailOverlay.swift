@@ -144,7 +144,8 @@ struct DayDetailOverlay: View {
                                         .font(.system(size: 14, weight: .semibold))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
-                                        .foregroundStyle(isAllSelected ? Color.primary : Color.red)
+                                        .background(RoundedRectangle(cornerRadius: 16).fill(isAllSelected ? Color.red.opacity(0.8) : .gray.opacity(0.15)))
+                                        .foregroundStyle(isAllSelected ? Color.white : Color.primary)
                                 }
                                 
                                 if hasNearDuplicates {
@@ -156,7 +157,8 @@ struct DayDetailOverlay: View {
                                         .font(.system(size: 14, weight: .semibold))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
-                                        .foregroundStyle(.blue)
+                                        .background(RoundedRectangle(cornerRadius: 16).fill(Color.blue.opacity(0.8)))
+                                        .foregroundStyle(.white)
                                     }
                                 }
                             }
@@ -180,9 +182,10 @@ struct DayDetailOverlay: View {
                                                 let selected = isGroupSelected(group.photos)
                                                     Text(selected ? NSLocalizedString("daydetailoverlay_unselect_group", comment: "") : NSLocalizedString("daydetailoverlay_select_group", comment: ""))
                                                     .font(.system(size: 13, weight: .semibold))
-                                                    .foregroundStyle(selected ? Color.primary : Color.red)
+                                                    .foregroundStyle(selected ? Color.white : Color.red)
                                                     .padding(.horizontal, 10)
                                                     .padding(.vertical, 4)
+                                                    .background(RoundedRectangle(cornerRadius: 12).fill(selected ? Color.red.opacity(0.8) : Color.red.opacity(0.15)))
                                             }
                                         }
                                         .padding(.horizontal, 16)
