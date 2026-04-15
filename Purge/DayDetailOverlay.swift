@@ -144,7 +144,7 @@ struct DayDetailOverlay: View {
                                         .font(.system(size: 14, weight: .semibold))
                                         .padding(.horizontal, 16)
                                         .padding(.vertical, 8)
-                                        .foregroundStyle(isAllSelected ? .primary : .red)
+                                        .foregroundStyle(isAllSelected ? Color.primary : Color.red)
                                 }
                                 
                                 if hasNearDuplicates {
@@ -180,7 +180,7 @@ struct DayDetailOverlay: View {
                                                 let selected = isGroupSelected(group.photos)
                                                     Text(selected ? NSLocalizedString("daydetailoverlay_unselect_group", comment: "") : NSLocalizedString("daydetailoverlay_select_group", comment: ""))
                                                     .font(.system(size: 13, weight: .semibold))
-                                                    .foregroundStyle(selected ? .primary : .red)
+                                                    .foregroundStyle(selected ? Color.primary : Color.red)
                                                     .padding(.horizontal, 10)
                                                     .padding(.vertical, 4)
                                             }
