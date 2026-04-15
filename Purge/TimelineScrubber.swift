@@ -21,7 +21,7 @@ struct TimelineScrubber: View {
             ZStack(alignment: .trailing) {
                 Rectangle()
                     .fill(Color.white.opacity(0.001))
-                    .frame(width: 60, height: trackHeight)
+                    .frame(width: 30, height: trackHeight)
                 
                 ZStack(alignment: .center) {
                     Capsule()
@@ -29,14 +29,6 @@ struct TimelineScrubber: View {
                         .frame(width: 4, height: trackHeight)
                     
                     ZStack {
-                        Circle()
-                            .fill(PurgeColor.rose)
-                            .frame(width: 14, height: 14)
-                            .overlay(
-                                Circle().strokeBorder(Color.white, lineWidth: 2)
-                            )
-                            .shadow(color: Color.black.opacity(0.12), radius: 4, x: 0, y: 2)
-                        
                         if isDragging && !months.isEmpty {
                             Text(months[currentIndex].uppercased())
                                 .font(PurgeFont.ui(14, weight: .bold))
@@ -49,7 +41,7 @@ struct TimelineScrubber: View {
                                     Capsule().fill(PurgeColor.text)
                                 )
                                 .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 4)
-                                .offset(x: -60)
+                                .offset(x: -50)
                                 .transition(.asymmetric(
                                     insertion: .scale(scale: 0.8).combined(with: .opacity),
                                     removal: .opacity
@@ -61,9 +53,9 @@ struct TimelineScrubber: View {
                     .animation(.spring(response: 0.4, dampingFraction: 0.65), value: isDragging)
                 }
                 .frame(width: 14)
-                .padding(.trailing, 8)
+                .padding(.trailing, 4)
             }
-            .frame(width: 60, height: trackHeight)
+            .frame(width: 30, height: trackHeight)
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
@@ -90,7 +82,7 @@ struct TimelineScrubber: View {
                                 }
                                 
                                 withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                                    proxy.scrollTo(months[index], anchor: .center)
+                                    proxy.scrollTo("header_\(months[index])", anchor: UnitPoint(x: 0.5, y: 0.3))
                                 }
                             }
                         }

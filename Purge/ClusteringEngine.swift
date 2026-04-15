@@ -295,7 +295,7 @@ enum ClusteringEngine {
     }()
     
     nonisolated private static let dateRangeFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "d MMM"; return f
+        let f = DateFormatter(); f.dateFormat = "d MMM yyyy"; return f
     }()
     
     nonisolated private static let shortDateFormatter: DateFormatter = {

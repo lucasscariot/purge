@@ -40,7 +40,6 @@ struct DummyPhoto: Identifiable, Hashable {
     func hash(into hasher: inout Hasher) { hasher.combine(id) }
     static func == (lhs: DummyPhoto, rhs: DummyPhoto) -> Bool { lhs.id == rhs.id }
 
-    // Backwards-compatible init (dummy/preview data)
     init(color: Color, label: String, date: String, sizeMB: Int) {
         self.localIdentifier = nil
         self.color = color
@@ -49,7 +48,6 @@ struct DummyPhoto: Identifiable, Hashable {
         self.sizeMB = sizeMB
     }
 
-    // Real-photo init
     init(localIdentifier: String, color: Color, label: String, date: String, sizeMB: Int) {
         self.localIdentifier = localIdentifier
         self.color = color

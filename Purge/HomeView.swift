@@ -343,7 +343,7 @@ struct HomeView: View {
                                 .font(PurgeFont.display(24, weight: .bold))
                                 .foregroundStyle(PurgeColor.text)
                                 .padding(.horizontal, 24)
-                                .id(group.id)
+                                .id("header_\(group.id)")
                             
                             LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
                                 ForEach(group.days) { day in
@@ -388,7 +388,7 @@ struct HomeView: View {
     
     private func formattedDate(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM"
+        formatter.dateFormat = "d MMM yyyy"
         return formatter.string(from: date)
     }
     

@@ -679,7 +679,7 @@ final class ScanEngine {
                 localIdentifier: id,
                 color: Color(hex: "1E1E1E"),
                 label: "PHOTO",
-                date: meta.date.map { shortDate($0) } ?? "",
+                date: meta.date.map { Self.shortDateFormatter.string(from: $0).uppercased() } ?? "",
                 sizeMB: Int(meta.estimatedFileSize / 1_000_000)
             )
         }
@@ -703,7 +703,7 @@ final class ScanEngine {
                 localIdentifier: id,
                 color: Color(hex: "1E1E1E"),
                 label: "PHOTO",
-                date: meta.date.map { shortDate($0) } ?? "",
+                date: meta.date.map { Self.shortDateFormatter.string(from: $0).uppercased() } ?? "",
                 sizeMB: Int(meta.estimatedFileSize / 1_000_000)
             )
         }
@@ -727,7 +727,7 @@ final class ScanEngine {
                 localIdentifier: id,
                 color: Color(hex: "1E1E1E"),
                 label: "PHOTO",
-                date: asset.creationDate.map { shortDate($0) } ?? "",
+                date: asset.creationDate.map { Self.shortDateFormatter.string(from: $0).uppercased() } ?? "",
                 sizeMB: Int(asset.fileSize / 1_000_000)
             )
         }
@@ -795,7 +795,7 @@ final class ScanEngine {
     }
 
     private static let shortDateFormatter: DateFormatter = {
-        let f = DateFormatter(); f.dateFormat = "d MMM"; return f
+        let f = DateFormatter(); f.dateFormat = "d MMM yyyy"; return f
     }()
 
     private func shortDate(_ date: Date) -> String {
