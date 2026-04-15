@@ -535,7 +535,7 @@ struct HomeView: View {
                     .foregroundStyle(PurgeColor.text)
                 
                 if let progress = scanProgress {
-                    Text("\(Int(progress * 100))% complete")
+                    Text(String(format: NSLocalizedString("homeview_percent_complete", comment: ""), Int(progress * 100)))
                         .font(PurgeFont.ui(14, weight: .medium))
                         .foregroundStyle(PurgeColor.textMuted)
                 }
