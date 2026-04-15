@@ -50,12 +50,11 @@
 "homeview_greeting_format" = "%@, %@";
 "homeview_greeting_format_question" = "%@, %@?";
 "daydetailoverlay_remove" = "Удалить";
-"daydetailoverlay_remove_count" = "Удалить (%lld)";"daydetailoverlay_select_all" = "Выбрать всё";
+"daydetailoverlay_remove_count" = "Удалить (%lld)";
+"daydetailoverlay_select_all" = "Выбрать всё";
 "daydetailoverlay_unselect_all" = "Снять выделение";
 "daydetailoverlay_select_group" = "Выбрать группу";
 "daydetailoverlay_unselect_group" = "Отменить выбор группы";
-"daydetailoverlay_remove" = "Удалить";
-"daydetailoverlay_remove_count" = "Удалить (%lld)";
 "homeview_tip_private_title" = "100% Конфиденциально";
 "homeview_tip_private_desc" = "Ваши фото не покидают устройство. Всё сканирование происходит локально.";
 "homeview_tip_duplicates_title" = "Поиск дубликатов";
