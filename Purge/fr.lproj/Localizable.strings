@@ -63,3 +63,12 @@
 "homeview_tip_zoom_desc" = "Vous pouvez pincer n'importe quelle pile de photos pour y voir de plus près avant de purger.";
 "homeview_tip_smart_title" = "Organisation intelligente";
 "homeview_tip_smart_desc" = "Nous détectons également les reçus, les captures d'écran et les photos floues.";
+
+"homeview_background_scan_title" = "Mise à jour des nouvelles photos";
+"homeview_background_scan_subtitle" = "EN_COURS_EN_ARRIERE_PLAN";
+"homeview_preparing_title" = "Préparation de votre bibliothèque";
+"homeview_preparing_subtitle" = "Vos photos vont apparaître ici dans un instant.";
+"homeview_near_duplicates_label" = "quasi-doublons";
+"homeview_across_days_format" = "sur %lld jours";
+"homeview_days_label" = "jours";
+"homeview_refreshing" = "Actualisation";

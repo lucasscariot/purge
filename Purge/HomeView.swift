@@ -119,14 +119,25 @@ struct HomeView: View {
                             
                             VStack(spacing: 24) {
                                 Color.clear.frame(height: topSafeArea)
-                                
+
+                                if scanEngine.isBackgroundScan {
+                                    backgroundScanBanner
+                                        .padding(.horizontal, 24)
+                                        .padding(.top, 8)
+                                        .transition(.opacity.combined(with: .move(edge: .top)))
+                                }
+
                                 heroSection
                                     .padding(.top, 16)
                                 
                                 if scanProgress != nil {
                                     scanningState
                                 } else if dayGroups.isEmpty {
-                                    emptyState
+                                    if scanEngine.isScanning {
+                                        preparingState
+                                    } else {
+                                        emptyState
+                                    }
                                 } else {
                                     photoStacksSection
                                         .padding(.top, 16)
@@ -134,6 +145,7 @@ struct HomeView: View {
                                 
                                 Color.clear.frame(height: 120)
                             }
+                            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: scanEngine.isBackgroundScan)
                             .background(
                                 GeometryReader { geo in
                                     Color.clear.preference(key: ScrollViewContentHeightKey.self, value: geo.size.height)
@@ -141,7 +153,7 @@ struct HomeView: View {
                             )
                         }
                     }
-                    .scrollDisabled(scanProgress != nil)
+                    .scrollDisabled(scanProgress != nil && !scanEngine.isBackgroundScan)
                     .onPreferenceChange(ScrollViewContentHeightKey.self) { height in
                         let roundedHeight = round(height)
                         if abs(contentHeight - roundedHeight) > 1.0 {
@@ -204,43 +216,256 @@ struct HomeView: View {
         return windowScene?.windows.first?.bounds.height ?? windowScene?.screen.bounds.height ?? 852
     }
     
+    // MARK: - Background scan banner
+
+    /// Editorial scrapbook banner shown at the top of HomeView while a silent
+    /// incremental scan is running. Mirrors the language of the hero block:
+    /// a paper card with a mustard washi-tape strip, a mono uppercase status
+    /// label, a serif progress fraction, a percentage on the right, and a
+    /// hairline mustard rule that fills as Vision crunches batches.
+    /// SPEC: this banner MUST stay non-blocking — the user can scroll the
+    /// grid, open day overlays, etc. while it's visible.
+    private var backgroundScanBanner: some View {
+        let progress = scanEngine.liveProgress
+        let fraction: Double? = {
+            guard let p = progress, p.total > 0 else { return nil }
+            return Double(p.current) / Double(p.total)
+        }()
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                PurgePulseDot(color: PurgeColor.mustard, baseSize: 5)
+                    .frame(width: 12, height: 12)
+
+                Text("homeview_background_scan_title")
+                    .font(PurgeFont.mono(10, weight: .semibold))
+                    .foregroundStyle(PurgeColor.textMuted)
+                    .textCase(.uppercase)
+                    .tracking(1.4)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                Spacer(minLength: 0)
+
+                if let f = fraction {
+                    Text("\(Int((f * 100).rounded()))%")
+                        .font(PurgeFont.mono(10, weight: .semibold))
+                        .foregroundStyle(PurgeColor.text)
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                }
+            }
+
+            HStack(alignment: .lastTextBaseline, spacing: 6) {
+                if let p = progress, p.total > 0 {
+                    Text(formatted(p.current))
+                        .font(PurgeFont.display(22, weight: .bold))
+                        .foregroundStyle(PurgeColor.text)
+                        .contentTransition(.numericText())
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.6)
+
+                    Text("/ \(formatted(p.total))")
+                        .font(PurgeFont.mono(11, weight: .medium))
+                        .foregroundStyle(PurgeColor.textMuted)
+                        .lineLimit(1)
+                } else {
+                    Text("homeview_background_scan_subtitle")
+                        .font(PurgeFont.mono(11, weight: .medium))
+                        .foregroundStyle(PurgeColor.textMuted)
+                        .lineLimit(1)
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            ScanProgressRule(fraction: fraction)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(PurgeColor.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(PurgeColor.mustard.opacity(0.22), lineWidth: 0.6)
+        )
+        .overlay(alignment: .topLeading) {
+            // Reuse the same washi tape look as the scrapbook chips, but
+            // anchored further in so it visually "pins" a wider banner.
+            Rectangle()
+                .fill(PurgeColor.mustard.opacity(0.55))
+                .overlay(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.45), Color.white.opacity(0.05)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .frame(width: 44, height: 12)
+                .rotationEffect(.degrees(-8))
+                .offset(x: 22, y: -6)
+                .shadow(color: Color.black.opacity(0.08), radius: 1.5, x: 0, y: 1)
+                .allowsHitTesting(false)
+        }
+        .shadow(color: PurgeColor.mustard.opacity(0.14), radius: 14, x: 0, y: 8)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+    }
+
     // MARK: - Hero
     
     private var statsPill: some View {
-        HStack(spacing: 8) {
+        PurgeHeaderPill(variant: .neutral, verticalPadding: 10) {
             Image(systemName: "internaldrive.fill")
                 .font(.system(size: 12, weight: .bold))
                 .foregroundStyle(PurgeColor.mustard)
-            
+
             HStack(spacing: 4) {
                 Text("homeview_saved")
+                    .font(PurgeFont.ui(14, weight: .semibold))
                     .foregroundStyle(PurgeColor.textMuted)
+                    .purgePillSingleLine()
                 Text(formatBytes(totalMemorySaved))
+                    .font(PurgeFont.ui(14, weight: .semibold))
                     .foregroundStyle(PurgeColor.text)
+                    .purgePillSingleLine()
             }
-            .font(PurgeFont.ui(14, weight: .semibold))
-            
+
             if totalPhotosRemoved > 0 {
                 Circle()
                     .frame(width: 3, height: 3)
                     .foregroundStyle(PurgeColor.textMuted.opacity(0.5))
-                
-                            Text(String(format: NSLocalizedString("homeview_photos_removed", comment: ""), totalPhotosRemoved))
+
+                Text(String(format: NSLocalizedString("homeview_photos_removed", comment: ""), totalPhotosRemoved))
                     .font(PurgeFont.ui(14, weight: .medium))
                     .foregroundStyle(PurgeColor.textMuted)
+                    .purgePillSingleLine()
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 10)
-        .background(.ultraThinMaterial)
-        .clipShape(Capsule())
-        .overlay(
-            Capsule()
-                .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.5)
-        )
-        .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
     }
     
+    // NOTE: The previous frosted `photoCountPill` / `nearDuplicatesCountPill` /
+    // `nearDuplicatesDaysPill` were replaced by the editorial hero block
+    // (`heroNumberBlock` + `heroScrapbookChips`). Keeping `PurgeHeaderPill` as
+    // a shared component for any future header pill needs (it is still used
+    // by `statsPill`).
+
+    // ── Hero (editorial / scrapbook) ────────────────────────────────────
+    // SPEC: this is a paid-production hero. Hierarchy is:
+    //   1. statsPill (only when something has been saved) — small frosted chip
+    //      anchored top-left, acts as a "seal" on the page
+    //   2. handwritten greeting (Delius cursive) — personal, scrapbook tone
+    //   3. "Your Library" — bold serif page title
+    //   4. mustard editorial rule — visual anchor / magazine spread cue
+    //   5. hero number — gigantic serif photo count, the page's focal point
+    //   6. scrapbook stat chips (rose / peach) — tape-pinned, lightly rotated
+    // Animations are staggered by ~60ms per row to feel curated, not robotic.
+    // ────────────────────────────────────────────────────────────────────
+
+    private var heroGreeting: some View {
+        // SPEC: greeting uses the app's soft rounded UI face (SF Pro Rounded)
+        // — the cursive scrapbook font felt off-brand against the editorial
+        // serif title. Uppercase + tracking gives it an editorial small-caps
+        // feel that complements the "// APR 2026" issue tag.
+        Text(greeting)
+            .font(PurgeFont.ui(13, weight: .semibold))
+            .foregroundStyle(PurgeColor.textMuted)
+            .textCase(.uppercase)
+            .tracking(1.6)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+    }
+
+    private var heroTitleRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text("homeview_your_library")
+                .font(PurgeFont.display(46, weight: .bold))
+                .foregroundStyle(PurgeColor.text)
+                .tracking(-1)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Spacer(minLength: 0)
+
+            Text(issueTag)
+                .font(PurgeFont.mono(10, weight: .semibold))
+                .foregroundStyle(PurgeColor.textMuted)
+                .tracking(1.5)
+                .padding(.bottom, 6)
+        }
+    }
+
+    /// "// APR 2026" style issue tag — adds a magazine-spread feel to the title.
+    private var issueTag: String {
+        let f = DateFormatter()
+        f.dateFormat = "MMM yyyy"
+        return "// " + f.string(from: Date()).uppercased()
+    }
+
+    /// Magazine-grade focal number: the photo count rendered as a 76pt serif,
+    /// flanked by a mustard accent rule + mono caption. Replaces the previous
+    /// `photoCountPill` — same data, much higher impact.
+    private var heroNumberBlock: some View {
+        let countLabel: String = dynamicPhotoCount > 0 ? formatted(dynamicPhotoCount) : "—"
+        return HStack(alignment: .lastTextBaseline, spacing: 14) {
+            Text(countLabel)
+                .font(PurgeFont.display(60, weight: .bold))
+                .foregroundStyle(PurgeColor.text)
+                .contentTransition(.numericText())
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .tracking(-1.5)
+                .changeEffect(.shine, value: dynamicPhotoCount)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Rectangle()
+                    .fill(PurgeColor.mustard)
+                    .frame(width: 28, height: 3)
+                Text("homeview_photos_waiting")
+                    .font(PurgeFont.mono(10, weight: .semibold))
+                    .foregroundStyle(PurgeColor.textMuted)
+                    .textCase(.uppercase)
+                    .tracking(1.2)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+            }
+            .padding(.bottom, 10)
+
+            Spacer(minLength: 0)
+        }
+        .animation(.spring(response: 0.5, dampingFraction: 0.85), value: dynamicPhotoCount)
+    }
+
+    /// Two scrapbook chips that wrap on narrow widths (FlowLayout). Each chip
+    /// is a tape-pinned card with a light rotation — kept distinct from the
+    /// frosted material pills used elsewhere so they read as "stickers".
+    private var heroScrapbookChips: some View {
+        FlowLayout(spacing: 14) {
+            if scanEngine.totalNearDuplicateCount > 0 {
+                ScrapbookStatChip(
+                    value: formatted(scanEngine.totalNearDuplicateCount),
+                    label: NSLocalizedString("homeview_near_duplicates_label", comment: ""),
+                    icon: "rectangle.on.rectangle.angled.fill",
+                    tint: PurgeColor.rose,
+                    rotation: -1.8,
+                    trailingPulse: scanEngine.isScanning
+                )
+
+                if scanEngine.daysWithDuplicates > 0 {
+                    ScrapbookStatChip(
+                        value: formatted(scanEngine.daysWithDuplicates),
+                        label: NSLocalizedString("homeview_days_label", comment: ""),
+                        icon: "calendar",
+                        tint: PurgeColor.peach,
+                        rotation: 1.6
+                    )
+                }
+            }
+        }
+    }
+
     private var heroSection: some View {
         VStack(alignment: .leading, spacing: 20) {
             if totalMemorySaved > 0 {
@@ -248,49 +473,33 @@ struct HomeView: View {
                     .opacity(isAppeared ? 1 : 0)
                     .offset(y: isAppeared ? 0 : -15)
             }
-            
-            VStack(alignment: .leading, spacing: 6) {
-                Text(greeting)
-                    .font(PurgeFont.ui(16, weight: .semibold))
-                    .foregroundStyle(PurgeColor.textMuted)
-                    .textCase(.uppercase)
-                    .kerning(1.2)
+
+            VStack(alignment: .leading, spacing: 10) {
+                heroGreeting
                     .opacity(isAppeared ? 1 : 0)
                     .offset(y: isAppeared ? 0 : 15)
-                
-                Text("homeview_your_library")
-                    .font(PurgeFont.display(42, weight: .bold))
-                    .foregroundStyle(PurgeColor.text)
+
+                heroTitleRow
                     .opacity(isAppeared ? 1 : 0)
                     .offset(y: isAppeared ? 0 : 15)
-                
-                HStack(spacing: 8) {
-                    Image(systemName: "photo.fill")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(PurgeColor.mustard)
-                    
-                    HStack(spacing: 4) {
-                        Text("\(formatted(dynamicPhotoCount))")
-                            .foregroundStyle(PurgeColor.text)
-                            .font(PurgeFont.ui(14, weight: .bold))
-                        
-                        Text("homeview_photos_waiting")
-                            .foregroundStyle(PurgeColor.textMuted)
-                            .font(PurgeFont.ui(14, weight: .medium))
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(.ultraThinMaterial)
-                .clipShape(Capsule())
-                .overlay(
-                    Capsule()
-                        .strokeBorder(Color.white.opacity(0.3), lineWidth: 0.5)
-                )
-                .shadow(color: Color.black.opacity(0.05), radius: 10, x: 0, y: 4)
-                .opacity(isAppeared ? 1 : 0)
-                .offset(y: isAppeared ? 0 : 15)
-                .padding(.top, 4)
+
+                EditorialRule()
+                    .padding(.top, 2)
+                    .opacity(isAppeared ? 1 : 0)
+                    .scaleEffect(x: isAppeared ? 1 : 0.4, anchor: .leading)
+
+                heroNumberBlock
+                    .padding(.top, 8)
+                    .opacity(isAppeared ? 1 : 0)
+                    .offset(y: isAppeared ? 0 : 15)
+
+                heroScrapbookChips
+                    .padding(.top, 14)
+                    .padding(.horizontal, -2) // let chip shadows breathe past the safe zone
+                    .opacity(isAppeared ? 1 : 0)
+                    .offset(y: isAppeared ? 0 : 20)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.85), value: scanEngine.totalNearDuplicateCount)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.85), value: scanEngine.daysWithDuplicates)
             }
         }
         .padding(.horizontal, 24)
@@ -494,8 +703,8 @@ struct HomeView: View {
         .buttonStyle(ScrapbookButtonStyle())
         .scaleEffect(isRescanPressed ? 0.92 : 1.0)
         .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isRescanPressed)
-        .disabled(scanProgress != nil)
-        .opacity(scanProgress != nil ? 0.5 : 1.0)
+        .disabled(scanProgress != nil || scanEngine.isScanning)
+        .opacity((scanProgress != nil || scanEngine.isScanning) ? 0.5 : 1.0)
         .animation(.spring(response: 0.25, dampingFraction: 0.7), value: isRescanPressed)
         .onChange(of: scanProgress) { _, newValue in
             if newValue != nil && !isRescanPressed {
@@ -605,6 +814,28 @@ struct HomeView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 80)
     }
+
+    /// Lightweight stand-in shown while the very first scan is enumerating the
+    /// library. The banner at the top surfaces progress; this just lets the user
+    /// know the photos are on their way without locking the screen.
+    private var preparingState: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(PurgeColor.mustard)
+                .symbolEffect(.pulse, options: .repeating)
+            Text("homeview_preparing_title")
+                .font(PurgeFont.display(24, weight: .bold))
+                .foregroundStyle(PurgeColor.text)
+            Text("homeview_preparing_subtitle")
+                .font(PurgeFont.ui(16, weight: .medium))
+                .foregroundStyle(PurgeColor.textMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 80)
+    }
     
     private func formatted(_ n: Int) -> String {
         n >= 1000 ? "\(n / 1000),\(String(format: "%03d", n % 1000))" : "\(n)"
@@ -615,6 +846,35 @@ struct HomeView: View {
         formatter.allowedUnits = [.useAll]
         formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
+    }
+}
+
+// MARK: - ScanningPulse
+//
+// SPEC: Small reusable badge dot that pulses while a background scan is
+// running. Used inside the duplicates pill to indicate that the count is
+// being refreshed in realtime. Designed to be lightweight (no Combine, no
+// timers) so it doesn't add render cost during the scan it represents.
+private struct ScanningPulse: View {
+    let color: Color
+    @State private var pulse = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(color.opacity(0.35))
+                .frame(width: 14, height: 14)
+                .scaleEffect(pulse ? 1.15 : 0.6)
+                .opacity(pulse ? 0.0 : 0.8)
+            Circle()
+                .fill(color)
+                .frame(width: 6, height: 6)
+        }
+        .onAppear {
+            withAnimation(.easeOut(duration: 1.1).repeatForever(autoreverses: false)) {
+                pulse = true
+            }
+        }
     }
 }
 

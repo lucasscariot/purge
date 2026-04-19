@@ -63,3 +63,12 @@
 "homeview_tip_zoom_desc" = "Сведите пальцы на стопке фото, чтобы рассмотреть их поближе перед удалением.";
 "homeview_tip_smart_title" = "Умная организация";
 "homeview_tip_smart_desc" = "Мы также находим чеки, скриншоты и размытые снимки.";
+
+"homeview_background_scan_title" = "Обработка новых фото";
+"homeview_background_scan_subtitle" = "В_ФОНОВОМ_РЕЖИМЕ";
+"homeview_preparing_title" = "Подготовка вашей библиотеки";
+"homeview_preparing_subtitle" = "Ваши фото появятся здесь через мгновение.";
+"homeview_near_duplicates_label" = "почти-дубликаты";
+"homeview_across_days_format" = "за %lld дней";
+"homeview_days_label" = "дней";
+"homeview_refreshing" = "Обновление";

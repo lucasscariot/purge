@@ -34,6 +34,261 @@ enum PurgeColor {
     static let border      = Color(hex: "2D2B2A").opacity(0.08)
 }
 
+// MARK: - Header pills (hero stats)
+
+/// Shared chrome for hero “pill” chips: frosted fill, hairline border, soft shadow.
+/// Use `FlowLayout` in the parent so pills wrap on narrow widths; keep labels
+/// single-line via ``View/purgePillSingleLine()`` — text should never wrap inside
+/// a pill.
+struct PurgeHeaderPill<Content: View>: View {
+    enum Variant {
+        /// White hairline border, neutral shadow — storage / photo count.
+        case neutral
+        /// Rose-tinted border & shadow — near-duplicate family.
+        case rose
+    }
+
+    let variant: Variant
+    var verticalPadding: CGFloat = PurgeHeaderPillMetrics.verticalPadding
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        HStack(alignment: .center, spacing: PurgeHeaderPillMetrics.innerSpacing) {
+            content()
+        }
+        .fixedSize(horizontal: true, vertical: false)
+        .padding(.horizontal, PurgeHeaderPillMetrics.horizontalPadding)
+        .padding(.vertical, verticalPadding)
+        .background(.ultraThinMaterial)
+        .clipShape(Capsule())
+        .overlay(
+            Capsule()
+                .strokeBorder(borderColor, lineWidth: PurgeHeaderPillMetrics.borderWidth)
+        )
+        .shadow(color: shadowColor, radius: PurgeHeaderPillMetrics.shadowRadius, x: 0, y: PurgeHeaderPillMetrics.shadowY)
+    }
+
+    private var borderColor: Color {
+        switch variant {
+        case .neutral: Color.white.opacity(0.3)
+        case .rose: PurgeColor.rose.opacity(0.25)
+        }
+    }
+
+    private var shadowColor: Color {
+        switch variant {
+        case .neutral: Color.black.opacity(0.05)
+        case .rose: PurgeColor.rose.opacity(0.08)
+        }
+    }
+}
+
+private enum PurgeHeaderPillMetrics {
+    static let horizontalPadding: CGFloat = 14
+    static let verticalPadding: CGFloat = 9
+    static let innerSpacing: CGFloat = 8
+    static let borderWidth: CGFloat = 0.5
+    static let shadowRadius: CGFloat = 10
+    static let shadowY: CGFloat = 4
+}
+
+extension View {
+    /// Single-line labels inside header pills (wrap the row with ``FlowLayout``, not words).
+    func purgePillSingleLine() -> some View {
+        lineLimit(1)
+            .minimumScaleFactor(0.78)
+    }
+}
+
+// MARK: - Scrapbook chip (tape-pinned hero stat)
+
+/// Tape-pinned scrapbook card used for hero stats (near-duplicates, days, …).
+/// Sits on the cream paper background with a gentle rotation, a hand-torn
+/// washi-tape strip on the top edge, and a soft drop shadow so it reads as a
+/// physical sticker rather than a flat UI chip.
+struct ScrapbookStatChip: View {
+    let value: String
+    let label: String
+    let icon: String
+    let tint: Color
+    var rotation: Double = 0
+    var trailingPulse: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(tint)
+                    .frame(width: 16, alignment: .leading)
+
+                Text(value)
+                    .font(PurgeFont.display(26, weight: .bold))
+                    .foregroundStyle(PurgeColor.text)
+                    .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .tracking(-0.5)
+            }
+
+            HStack(spacing: 6) {
+                Text(label)
+                    .font(PurgeFont.mono(9, weight: .semibold))
+                    .foregroundStyle(PurgeColor.textMuted)
+                    .textCase(.uppercase)
+                    .tracking(1.2)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                if trailingPulse {
+                    PurgePulseDot(color: tint, baseSize: 5)
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(minWidth: 110, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(PurgeColor.surface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(tint.opacity(0.22), lineWidth: 0.6)
+        )
+        .overlay(alignment: .topLeading) { WashiTape(tint: tint) }
+        .shadow(color: tint.opacity(0.14), radius: 14, x: 0, y: 8)
+        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .rotationEffect(.degrees(rotation))
+    }
+}
+
+/// A short translucent strip mimicking masking tape, lightly rotated and offset
+/// so it appears to "pin" the chip to the page.
+private struct WashiTape: View {
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(tint.opacity(0.55))
+            Rectangle()
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white.opacity(0.45), Color.white.opacity(0.05)],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+        }
+        .frame(width: 38, height: 12)
+        .rotationEffect(.degrees(-10))
+        .offset(x: 14, y: -6)
+        .shadow(color: Color.black.opacity(0.08), radius: 1.5, x: 0, y: 1)
+        .allowsHitTesting(false)
+    }
+}
+
+/// Slow, low-amplitude pulsing dot. Re-implemented here so any chip / pill
+/// across the design system can use it without depending on HomeView.
+struct PurgePulseDot: View {
+    let color: Color
+    var baseSize: CGFloat = 6
+    @State private var pulsing = false
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(color.opacity(0.35))
+                .frame(width: baseSize * 2.2, height: baseSize * 2.2)
+                .scaleEffect(pulsing ? 1.15 : 0.55)
+                .opacity(pulsing ? 0.0 : 0.7)
+            Circle()
+                .fill(color)
+                .frame(width: baseSize, height: baseSize)
+        }
+        .frame(width: baseSize * 2.2, height: baseSize * 2.2)
+        .onAppear {
+            withAnimation(.easeOut(duration: 1.2).repeatForever(autoreverses: false)) {
+                pulsing = true
+            }
+        }
+    }
+}
+
+// MARK: - Scan progress rule
+
+/// A hairline progress rule designed to fit the editorial header. When
+/// `fraction` is set it draws a tinted fill from leading; when `nil` (we're
+/// still enumerating and don't know the denominator yet) it animates an
+/// indeterminate shimmer back and forth so the user knows work is happening.
+struct ScanProgressRule: View {
+    let fraction: Double?
+    var tint: Color = PurgeColor.mustard
+    var height: CGFloat = 3
+
+    @State private var shimmerPhase: CGFloat = -0.3
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(PurgeColor.text.opacity(0.07))
+                    .frame(height: height)
+
+                if let f = fraction {
+                    Capsule()
+                        .fill(tint)
+                        .frame(width: max(2, geo.size.width * CGFloat(min(max(f, 0), 1))), height: height)
+                        .animation(.easeOut(duration: 0.25), value: f)
+                } else {
+                    // Indeterminate shimmer — a 28%-wide gradient slug that
+                    // crosses the rule on a slow loop.
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [tint.opacity(0.0), tint.opacity(0.85), tint.opacity(0.0)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geo.size.width * 0.28, height: height)
+                        .offset(x: geo.size.width * shimmerPhase)
+                        .onAppear {
+                            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: false)) {
+                                shimmerPhase = 1.0
+                            }
+                        }
+                }
+            }
+        }
+        .frame(height: height)
+        .clipShape(Capsule())
+    }
+}
+
+// MARK: - Editorial accent rule
+
+/// Two-tone hairline rule used under the hero title to give the page a
+/// magazine-spread feel. The tinted segment leads into a softer extension that
+/// fades into the paper background.
+struct EditorialRule: View {
+    var tint: Color = PurgeColor.mustard
+    var width: CGFloat = 56
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Capsule()
+                .fill(tint)
+                .frame(width: width, height: 3)
+            Capsule()
+                .fill(PurgeColor.text.opacity(0.12))
+                .frame(width: width * 0.6, height: 1.5)
+                .padding(.leading, 6)
+        }
+    }
+}
+
 // MARK: - Typography
 
 enum PurgeFont {

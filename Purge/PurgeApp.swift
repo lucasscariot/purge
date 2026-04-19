@@ -39,6 +39,10 @@ struct PurgeApp: App {
         WindowGroup {
             ContentRootView()
                 .environment(scanEngine)
+                // TEMP: lock the UI to light mode until dark-mode palette + materials
+                // are designed (header pills + DayDetailOverlay use semantic /
+                // vibrancy colours that currently shift with system appearance).
+                .preferredColorScheme(.light)
         }
         .modelContainer(for: [AssetRecord.self, ClusterRecord.self, MemorySaved.self])
     }
@@ -67,12 +71,20 @@ struct ContentRootView: View {
 
     var body: some View {
         rootContent
-            // Restore persisted scan results on app launch.
-            // Runs once when the view appears; loadExistingClusters sets
-            // phase = .complete and populates dayGroups if data exists.
+            // Restore persisted scan results on app launch, then quietly look for
+            // any new photos taken since the last scan. The background scan keeps
+            // the UI fully usable.
             .task {
                 scanEngine.loadExistingClusters(context: modelContext)
                 AnalyticsService.logAppOpen()
+                scanEngine.autoScanIfNeeded(context: modelContext)
+            }
+            // Re-check whenever the user returns to the app — they may have shot
+            // new photos in another app since the last foreground.
+            .onReceive(
+                NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)
+            ) { _ in
+                scanEngine.autoScanIfNeeded(context: modelContext)
             }
     }
 
@@ -82,53 +94,42 @@ struct ContentRootView: View {
         // changes (e.g. after photos are deleted). Without this, phase stays .complete
         // and SwiftUI never re-evaluates the body.
         let _ = scanEngine.dayGroups
+        let _ = scanEngine.isBackgroundScan
 
         switch scanEngine.phase {
-        case .idle:
-            if scanEngine.dayGroups.isEmpty {
-                emptyHomeView
-            } else {
-                // Show existing scan results even in idle state
-                HomeView(
-                    photoCount: scanEngine.photoCount,
-                    scanProgress: nil,
-                    currentPPS: nil,
-                    onRescan: { scanEngine.rescan(context: modelContext) },
-                    onStartReview: nil  // TODO: navigate to review flow
-                )
-            }
-
-        case .rescanning, .requestingPermission:
-            HomeView(
-                photoCount: scanEngine.photoCount,
-                scanProgress: 0.01,
-                currentPPS: scanEngine.currentPPS,
-                onRescan: {}
-            )
-
-        case .enumerating, .analysing, .clustering, .complete:
-            HomeView(
-                photoCount: scanEngine.photoCount,
-                scanProgress: scanProgress,
-                currentPPS: scanEngine.currentPPS,
-                onRescan: { scanEngine.rescan(context: modelContext) }
-            )
-
         case .permissionDenied:
             permissionDeniedView
 
         case .error(let message):
             errorView(message)
+
+        default:
+            // A single HomeView instance handles every "normal" state. Keeping the
+            // same view identity across phase / isBackgroundScan changes preserves
+            // its @State (e.g. heroSection's isAppeared), so the header doesn't
+            // flicker when the background-scan banner appears or disappears.
+            HomeView(
+                photoCount: scanEngine.photoCount,
+                scanProgress: homeScanProgress,
+                currentPPS: scanEngine.currentPPS,
+                onRescan: homeRescanAction,
+                onStartReview: nil
+            )
         }
     }
 
-    private var emptyHomeView: some View {
-        HomeView(
-            photoCount: 0,
-            scanProgress: nil,
-            currentPPS: nil,
-            onRescan: { scanEngine.startScan(context: modelContext) }
-        )
+    /// Progress shown inside HomeView's circular indicator. Returns `nil` while a
+    /// background scan is running so the photo grid stays visible (the banner
+    /// surfaces progress instead).
+    private var homeScanProgress: Double? {
+        if scanEngine.isBackgroundScan { return nil }
+        return scanProgress
+    }
+
+    /// Tap-handler for the floating rescan button. Always silent so the UI stays
+    /// usable; the inline banner surfaces progress.
+    private var homeRescanAction: () -> Void {
+        { scanEngine.startScan(context: modelContext) }
     }
 
     private var permissionDeniedView: some View {
@@ -146,7 +147,7 @@ struct ContentRootView: View {
 
     private var scanProgress: Double? {
         switch scanEngine.phase {
-        case .rescanning:                          return 0.01
+        case .rescanning, .requestingPermission:    return 0.01
         case .enumerating:                          return 0.02
         case .analysing(let current, let total):    return total > 0 ? max(0.01, Double(current) / Double(total)) : 0.02
         case .clustering:                           return 0.98

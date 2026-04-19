@@ -63,3 +63,12 @@
 "homeview_tip_zoom_desc" = "You can pinch any photo stack to get a closer look before purging.";
 "homeview_tip_smart_title" = "Smart Organization";
 "homeview_tip_smart_desc" = "We scan for receipts, screenshots, and blurry shots too.";
+
+"homeview_background_scan_title" = "Catching up on new photos";
+"homeview_background_scan_subtitle" = "WORKING_IN_BACKGROUND";
+"homeview_preparing_title" = "Preparing your library";
+"homeview_preparing_subtitle" = "Your photos will appear here in a moment.";
+"homeview_near_duplicates_label" = "near-duplicates";
+"homeview_across_days_format" = "across %lld days";
+"homeview_days_label" = "days";
+"homeview_refreshing" = "Refreshing";

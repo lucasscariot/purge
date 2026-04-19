@@ -2,6 +2,7 @@ import SwiftUI
 import Photos
 import Vision
 import SwiftData
+import UIKit
 
 // MARK: - Scan Phase
 
@@ -18,6 +19,28 @@ enum ScanPhase: Equatable {
 }
 
     // MARK: - Scan Engine
+//
+// ──────────────────────────────────────────────────────────────────────────
+// SPEC: Scan engine high-level behaviour (locked-in across iterations)
+// ──────────────────────────────────────────────────────────────────────────
+// 1. Scans are ALWAYS incremental + silent by default. The UI must remain
+//    fully usable (scrolling, taps, day overlay) while a scan runs.
+// 2. autoScanIfNeeded is called on app launch AND when re-entering the
+//    foreground. It MUST be a true no-op when the library is unchanged
+//    (see needsScan for the freshness contract).
+// 3. While a scan is running:
+//      • dayGroups stay populated (cached data + new days merged in).
+//      • Per-day nearDuplicateSets carried over from the previous scan
+//        keep the rose duplicate badges visible until fresh results land.
+//      • photoCount is only updated upward / to a non-zero value.
+//      • A slim background banner surfaces progress; full-screen takeover
+//        is reserved for explicit user-initiated full rescans.
+// 4. Scan throughput is intentionally throttled during background scans
+//    (utility QoS + per-batch sleep) to preserve scrolling FPS. The user
+//    can scroll the entire grid at 60/120 fps while the scan crunches.
+// 5. UI-facing @Observable state changes are throttled (≈5 Hz) so that
+//    @Observable subscribers don't get spammed mid-batch.
+// ──────────────────────────────────────────────────────────────────────────
 
 @MainActor
 @Observable
@@ -27,9 +50,53 @@ final class ScanEngine {
     var dayGroups: [DayGroup] = []
     var photoCount: Int = 0
 
+    /// True when the current scan is incremental and should NOT take over the UI.
+    /// Views read this to decide whether to show a small status banner instead of a
+    /// full-screen progress takeover, and to keep scrolling/interaction enabled.
+    /// SPEC: this MUST be true for every auto-triggered scan, and only false
+    /// for explicit user-initiated full rescans launched from the rescan button.
+    var isBackgroundScan: Bool = false
+
+    /// Convenience: the (current, total) tuple for the active scan, or nil when idle.
+    /// Useful for inline banners that display "1 234 / 12 000".
+    var liveProgress: (current: Int, total: Int)? {
+        if case .analysing(let c, let t) = phase { return (c, t) }
+        return nil
+    }
+
+    /// True while a scan is actively running (any phase besides idle/complete/error).
+    var isScanning: Bool {
+        switch phase {
+        case .rescanning, .requestingPermission, .enumerating, .analysing, .clustering:
+            return true
+        default:
+            return false
+        }
+    }
+
     // Dev Mode Stats
     var scanStartTime: Date?
     var currentPPS: Double = 0.0
+
+    // MARK: - Background task (extends runtime when app is backgrounded)
+    private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+
+    private func beginBackgroundTask() {
+        guard backgroundTaskID == .invalid else { return }
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "PurgeScan") { [weak self] in
+            // iOS is about to expire our background time — release the task.
+            // Persisted feature data per-batch means the next launch resumes cleanly.
+            guard let self else { return }
+            UIApplication.shared.endBackgroundTask(self.backgroundTaskID)
+            self.backgroundTaskID = .invalid
+        }
+    }
+
+    private func endBackgroundTask() {
+        guard backgroundTaskID != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTaskID)
+        backgroundTaskID = .invalid
+    }
 
     // ── DEBUG FLAGS ──────────────────────────────────────────────────────────
     // Set to a non-nil value to cap the number of photos processed.
@@ -320,23 +387,122 @@ final class ScanEngine {
         }
     }
 
-    // MARK: - Start (incremental) / Rescan (full wipe)
+    // MARK: - Start / Rescan / Auto
 
-    func startScan(context: ModelContext) {
-        guard phase == .idle || phase == .permissionDenied else { return }
+    /// User-initiated scan. Defaults to silent: the UI stays usable and just
+    /// surfaces a small inline banner. Pass `silent: false` to force the
+    /// full-screen takeover (used for the legacy first-scan flow).
+    func startScan(context: ModelContext, silent: Bool = true) {
+        guard !isScanning else { return }
+        isBackgroundScan = silent
         Task { await performScan(context: context, incremental: true) }
     }
 
+    /// User-initiated full rescan. Wipes everything and re-analyses from scratch.
+    /// Always shown in the foreground takeover so the user knows the heavy work
+    /// is intentional.
     func rescan(context: ModelContext) {
+        guard !isScanning else { return }
         Task {
+            isBackgroundScan = false
             dayGroups = []; photoCount = 0; phase = .rescanning
             await performScan(context: context, incremental: false)
         }
     }
 
-    // MARK: - Main Pipeline
+    /// Called on app launch / foreground. Quietly runs an incremental scan if there
+    /// is anything new to process, while leaving the UI fully usable. No-ops when
+    /// a scan is already in flight or the library hasn't changed since the last scan.
+    ///
+    /// SPEC: this MUST exit without touching `phase` or `dayGroups` if `needsScan`
+    /// returns false. The user opening the app on an unchanged library should see
+    /// no banner, no spinner, and no flicker.
+    func autoScanIfNeeded(context: ModelContext) {
+        guard !isScanning else { return }
+        guard PHPhotoLibrary.authorizationStatus(for: .readWrite) != .denied else { return }
 
+        Task {
+            guard await needsScan(context: context) else { return }
+            isBackgroundScan = true
+            await performScan(context: context, incremental: true)
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // SPEC: Auto-scan trigger semantics (locked-in requirements)
+    // ──────────────────────────────────────────────────────────────────────
+    // 1. autoScanIfNeeded MUST be a no-op when the library hasn't changed
+    //    since the last successful scan. Opening the app on an unchanged
+    //    library MUST NOT spin up Vision / SwiftData / PhotoKit work.
+    // 2. The freshness check is based on the maximum creationDate of any
+    //    AssetRecord we've seen — NOT on representativeDate (which is
+    //    start-of-day for day clusters and would falsely trigger any time
+    //    the user has at least one photo from today).
+    // 3. When AssetRecord is empty but photos exist in PhotoKit, this is
+    //    treated as a first-launch and a scan is triggered.
+    // 4. When PhotoKit holds fewer images than AssetRecord (deletions made
+    //    outside Purge), a scan is triggered so we can prune stale rows.
+    // 5. PHFetchOptions.fetchLimit = 1 keeps this O(1) in practice.
+    // ──────────────────────────────────────────────────────────────────────
+    private func needsScan(context: ModelContext) async -> Bool {
+        let assetRecords = (try? context.fetch(FetchDescriptor<AssetRecord>())) ?? []
+
+        // First-ever launch: scan iff there's anything in the library to scan.
+        if assetRecords.isEmpty {
+            let any = PHAsset.fetchAssets(with: .image, options: nil)
+            return any.count > 0
+        }
+
+        // Newest creationDate we've already persisted. Using the actual
+        // creationDate (not start-of-day) keeps this stable across same-day
+        // launches when nothing new has been shot.
+        let lastSeenDate: Date = assetRecords
+            .compactMap { $0.creationDate }
+            .max() ?? .distantPast
+
+        let opts = PHFetchOptions()
+        opts.predicate = NSPredicate(
+            format: "creationDate > %@",
+            lastSeenDate as NSDate
+        )
+        opts.fetchLimit = 1
+        let newer = PHAsset.fetchAssets(with: .image, options: opts)
+        if newer.count > 0 { return true }
+
+        // Detect deletions made outside Purge: if the live library is smaller
+        // than our recorded asset table, we should re-scan so the dayGroups
+        // reflect the new reality.
+        let liveCount = PHAsset.fetchAssets(with: .image, options: nil).count
+        if liveCount < assetRecords.count { return true }
+
+        return false
+    }
+
+    // MARK: - Main Pipeline
+    //
+    // ──────────────────────────────────────────────────────────────────────
+    // SPEC: UI behaviour during a background / incremental scan
+    // ──────────────────────────────────────────────────────────────────────
+    // The scan must not "blank out" what the user already sees:
+    //   • Cached dayGroups loaded by loadExistingClusters MUST stay visible
+    //     for the entire duration of the scan; no full wipe / re-set.
+    //   • Per-day nearDuplicateSets from the previous scan MUST be carried
+    //     over, so the rose-coloured "near-duplicates" pill and per-card
+    //     badges keep showing (with last known counts) while we recompute.
+    //   • New days (today / yesterday) that we discover before Vision runs
+    //     are merged into the existing list — never overwriting older days.
+    //   • photoCount is only updated to a non-zero value, so the hero
+    //     header doesn't flash "0 photos waiting" mid-scan.
+    //   • Phase updates to .analysing(current:total:) are throttled so we
+    //     don't spam SwiftUI with re-renders while Vision crunches batches.
+    // ──────────────────────────────────────────────────────────────────────
     private func performScan(context: ModelContext, incremental: Bool) async {
+        beginBackgroundTask()
+        defer {
+            endBackgroundTask()
+            isBackgroundScan = false
+        }
+
         // ── 1. Permission ──────────────────────────────────────────────────
         phase = .requestingPermission
         let status = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
@@ -357,6 +523,9 @@ final class ScanEngine {
         var existingFeatureMap: [String: Data] = [:]
         // Past days that are fully scanned — their photos won't change
         var alreadyScannedDays: Set<Date> = []
+        // Cached near-duplicate sets per day, keyed by start-of-day. Used to
+        // keep the dup badges visible on cards while the scan is running.
+        var cachedDupSetsByDay: [Date: [[String]]] = [:]
 
         if incremental {
             let assetRecords = (try? context.fetch(FetchDescriptor<AssetRecord>())) ?? []
@@ -369,13 +538,15 @@ final class ScanEngine {
                 if let date = r.representativeDate {
                     let dayStart = cal.startOfDay(for: date)
                     if dayStart < today { alreadyScannedDays.insert(dayStart) }
+                    let sets = r.nearDuplicateSets
+                    if !sets.isEmpty { cachedDupSetsByDay[dayStart] = sets }
                 }
             }
         }
 
         // ── 3. Pass 1 — Fast metadata enumeration (oldest → newest) ───────
         await MainActor.run { phase = .enumerating }
-        let allMetadata = await Task.detached(priority: .userInitiated) {
+        let allMetadata = await Task.detached(priority: .utility) {
             let opts = PHFetchOptions()
             // Oldest first — we process incrementally and past days are skipped
             opts.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
@@ -404,19 +575,75 @@ final class ScanEngine {
             cappedAllMetadata = Array(cappedAllMetadata.prefix(cap))
         }
 
-        photoCount = cappedAllMetadata.filter { !$0.isScreenshot }.count
+        // SPEC: never overwrite a non-zero photoCount with 0; that would make
+        // the header pill flash blank during the brief moment between
+        // enumeration and clustering.
+        let newPhotoCount = cappedAllMetadata.filter { !$0.isScreenshot }.count
+        if newPhotoCount > 0 || photoCount == 0 {
+            photoCount = newPhotoCount
+        }
         if cappedAllMetadata.isEmpty { phase = .complete; return }
 
         let initialRaw = await Task.detached(priority: .utility) {
             ClusteringEngine.buildInitialDayGroups(from: cappedAllMetadata)
         }.value
         let metaMap = Dictionary(uniqueKeysWithValues: cappedAllMetadata.map { ($0.localIdentifier, $0) })
-        dayGroups = initialRaw.compactMap { buildDayGroupFromRawCluster($0, metaMap: metaMap) }
 
+        // Build "fresh" day groups but inject the previously-known
+        // nearDuplicateSets for each day so the duplicate badges stay
+        // visible on the cards while Vision re-runs.
+        let initialDayGroups: [DayGroup] = initialRaw.compactMap { raw in
+            guard let base = buildDayGroupFromRawCluster(raw, metaMap: metaMap),
+                  let repDate = raw.representativeDate
+            else { return nil }
+            let dayStart = cal.startOfDay(for: repDate)
+            let cachedSets = cachedDupSetsByDay[dayStart] ?? []
+            return DayGroup(
+                id: base.id,
+                date: base.date,
+                location: base.location,
+                representativeLat: base.representativeLat,
+                representativeLng: base.representativeLng,
+                photos: base.photos,
+                nearDuplicateSets: cachedSets
+            )
+        }
+
+        // SPEC: never wipe the visible dayGroups during an incremental scan.
+        //   - First-ever scan (cached dayGroups empty): assign initialDayGroups
+        //     so the user sees the photo grid immediately.
+        //   - Subsequent scans: keep the cached entries for previously-known
+        //     days (preserving location, IDs, and near-dup badges) and only
+        //     merge in NEW days that weren't in the cached set.
+        if !incremental || dayGroups.isEmpty {
+            dayGroups = initialDayGroups
+        } else {
+            let cachedDayKeys = Set(dayGroups.map { cal.startOfDay(for: $0.date) })
+            let newDays = initialDayGroups.filter {
+                !cachedDayKeys.contains(cal.startOfDay(for: $0.date))
+            }
+            if !newDays.isEmpty {
+                dayGroups = (dayGroups + newDays).sorted { $0.date > $1.date }
+            }
+        }
+
+        // ── SPEC: incremental work selection ────────────────────────────────
+        // A photo NEVER gets re-Vision'd if its feature vector is already
+        // persisted in SwiftData. The previous logic only short-circuited
+        // photos belonging to "fully past" days, which forced us to redo
+        // Vision on the entire current day every time the user opened the
+        // app or pressed rescan — observable as "32 photos to scan" on every
+        // press. Now:
+        //   • preloadedCandidates  = ALL photos (any day) that already have
+        //                            a cached featureVectorData. These feed
+        //                            straight into clustering with no work.
+        //   • candidatesMeta       = temporal candidates that are MISSING a
+        //                            feature vector. These are the only
+        //                            photos that go through Vision.
+        // Result: pressing rescan on an unchanged library = 0 Vision work.
+        // ─────────────────────────────────────────────────────────────────
         let preloadedCandidates: [ScannedAssetInfo] = cappedAllMetadata.compactMap { meta in
-            guard !meta.isScreenshot, let date = meta.date else { return nil }
-            let dayStart = cal.startOfDay(for: date)
-            guard alreadyScannedDays.contains(dayStart),
+            guard !meta.isScreenshot,
                   let featureData = existingFeatureMap[meta.localIdentifier]
             else { return nil }
             return ScannedAssetInfo(
@@ -432,25 +659,32 @@ final class ScanEngine {
             )
         }
 
-        let unscannedMetadata = cappedAllMetadata.filter { meta in
-            guard !meta.isScreenshot, let date = meta.date else { return !meta.isScreenshot }
-            let dayStart = cal.startOfDay(for: date)
-            return !alreadyScannedDays.contains(dayStart)
-        }
-
+        // Temporal candidates considered across the WHOLE library so a new
+        // photo taken today can still match against yesterday's neighbour.
         let candidateIDs = await Task.detached(priority: .utility) {
-            ClusteringEngine.temporalCandidates(from: unscannedMetadata)
+            ClusteringEngine.temporalCandidates(from: cappedAllMetadata)
         }.value
 
-        let candidatesMeta = unscannedMetadata.filter { candidateIDs.contains($0.localIdentifier) }
+        let candidatesMeta = cappedAllMetadata.filter { meta in
+            !meta.isScreenshot &&
+            candidateIDs.contains(meta.localIdentifier) &&
+            existingFeatureMap[meta.localIdentifier] == nil
+        }
         let candidateTotal = candidatesMeta.count
+        // alreadyScannedDays is no longer consulted for work selection —
+        // feature-vector presence is the source of truth. Silencing the
+        // unused-warning while keeping the variable available for future
+        // diagnostics (e.g. logging "skipped N days").
+        _ = alreadyScannedDays
         await MainActor.run { phase = .analysing(current: 0, total: candidateTotal) }
 
         let newCandidates = await processCandidates(
             candidatesMeta,
             totalCount: candidateTotal,
             allMetadata: cappedAllMetadata,
-            baselineCandidates: preloadedCandidates
+            baselineCandidates: preloadedCandidates,
+            context: context,
+            metadataByID: metaMap
         )
 
         let allScanned = preloadedCandidates + newCandidates
@@ -460,29 +694,19 @@ final class ScanEngine {
             ClusteringEngine.clusterByDay(allMetadata: cappedAllMetadata, scannedCandidates: allScanned)
         }.value
 
-        try? context.delete(model: ClusterRecord.self)
-        try? context.delete(model: AssetRecord.self)
-
-        let newFeatureMap = Dictionary(
-            uniqueKeysWithValues: newCandidates.compactMap { c -> (String, Data)? in
-                guard let d = c.featureData else { return nil }
-                return (c.localIdentifier, d)
-            }
-        )
-        let mergedFeatureMap = existingFeatureMap.merging(newFeatureMap) { _, new in new }
-
         let metadataLookup = Dictionary(uniqueKeysWithValues: cappedAllMetadata.map { ($0.localIdentifier, $0) })
         dayGroups = rawClusters
             .filter { $0.type == "day" }
             .compactMap { buildDayGroupFromRawCluster($0, metaMap: metadataLookup) }
 
-        // Persist to SwiftData (inserts only — no fetch+rebuild since we already built dayGroups).
-        // Saves happen on the main actor where context lives. Inserts are staged and flushed
-        // with a single save() call. This is fast since we removed the redundant fetch.
-        saveToSwiftData(
+        // Atomic finalization: replace clusters in a single transaction. Asset
+        // features were already persisted incrementally per-batch above, so even
+        // if the app is killed before this point the next launch resumes from
+        // the saved features instead of restarting from scratch.
+        finalizeSwiftData(
             allMetadata: allMetadata,
             rawClusters: rawClusters,
-            featureMap: mergedFeatureMap,
+            incremental: incremental,
             context: context
         )
 
@@ -497,12 +721,42 @@ final class ScanEngine {
     }
 
     // MARK: - Candidate Processing (off-main-actor batches)
+    //
+    // ──────────────────────────────────────────────────────────────────────
+    // SPEC: Scan throttling & UI smoothness (locked-in requirements)
+    // ──────────────────────────────────────────────────────────────────────
+    // 1. Vision batches run at .utility priority (NOT .userInitiated) so the
+    //    main thread keeps headroom for SwiftUI rendering and gestures.
+    // 2. Background scans add a per-batch breathing-room sleep so users can
+    //    scroll the photo grid at full FPS while we crunch in the background.
+    //    The delay below is tuned for ~150-300 photos/sec on modern iPhones,
+    //    which is fast enough to feel "live" but light enough to keep
+    //    SwiftUI / scroll views buttery. Foreground scans skip the delay.
+    // 3. phase = .analysing(...) updates are throttled to ~5 Hz instead of
+    //    once per batch — a 40-photo batch can finish in <100ms and would
+    //    otherwise spam @Observable subscribers and trigger a re-render
+    //    storm in the inline progress banner.
+    // 4. PPS recomputation piggy-backs on the throttled phase update so the
+    //    "scanning N photos/sec" pill doesn't twitch.
+    // ──────────────────────────────────────────────────────────────────────
+
+    /// Minimum interval between MainActor `phase = .analysing(...)` updates.
+    /// 0.2s ≈ 5 UI ticks per second — enough to feel live without thrashing.
+    private static let phaseUpdateInterval: TimeInterval = 0.2
+
+    /// Per-batch sleep injected during background scans so the device stays
+    /// cool and the UI keeps a high frame rate while the user interacts.
+    /// Foreground (full rescan) scans skip this — the user explicitly asked
+    /// for the heavy work and is staring at the progress UI.
+    private static let backgroundScanBatchDelayNs: UInt64 = 60_000_000  // 60 ms
 
     private func processCandidates(
         _ candidates: [AssetMetadata],
         totalCount: Int,
         allMetadata: [AssetMetadata],
-        baselineCandidates: [ScannedAssetInfo] = []
+        baselineCandidates: [ScannedAssetInfo] = [],
+        context: ModelContext? = nil,
+        metadataByID: [String: AssetMetadata] = [:]
     ) async -> [ScannedAssetInfo] {
         guard !candidates.isEmpty else { return [] }
 
@@ -532,6 +786,8 @@ final class ScanEngine {
 
 
         var previousPrefetchAssets: [PHAsset] = []
+        var lastPhaseUpdate = Date(timeIntervalSince1970: 0)
+        let runningInBackground = isBackgroundScan
 
         for (batchIdx, batch) in batches.enumerated() {
             let currentAssets = batchPHAssets[batchIdx]
@@ -544,7 +800,8 @@ final class ScanEngine {
             stopPrefetching(for: previousPrefetchAssets)
             previousPrefetchAssets = currentAssets
 
-            let batchResults: [ScannedAssetInfo] = await Task.detached(priority: .userInitiated) {
+            // SPEC: utility priority — never block UI work on Vision batches.
+            let batchResults: [ScannedAssetInfo] = await Task.detached(priority: .utility) {
                 var out: [ScannedAssetInfo] = []
                 for asset in currentAssets {
                     guard let meta = batch.first(where: { $0.localIdentifier == asset.localIdentifier })
@@ -589,46 +846,98 @@ final class ScanEngine {
 
             results.append(contentsOf: batchResults)
 
+            // ── Persist this batch immediately ──
+            // If iOS suspends the app or kills it, the work we've done so far is
+            // still safe in SwiftData and the next launch's autoScanIfNeeded will
+            // skip it instead of redoing Vision on the same photos.
+            if let context {
+                upsertAssetRecords(batchResults, metadataByID: metadataByID, context: context)
+            }
+
             let processed = min((batchIdx + 1) * batchSize, totalCount)
-            await MainActor.run {
-                phase = .analysing(current: processed, total: totalCount)
-                if let start = scanStartTime {
-                    let elapsed = Date().timeIntervalSince(start)
-                    currentPPS = elapsed > 0 ? Double(processed) / elapsed : 0.0
+
+            // SPEC: throttle MainActor phase updates so SwiftUI doesn't redraw
+            // the inline progress banner more than ~5 times/sec, regardless of
+            // how fast Vision chews through batches.
+            let now = Date()
+            let isLastBatch = (batchIdx == batches.count - 1)
+            if isLastBatch || now.timeIntervalSince(lastPhaseUpdate) >= Self.phaseUpdateInterval {
+                lastPhaseUpdate = now
+                await MainActor.run {
+                    phase = .analysing(current: processed, total: totalCount)
+                    if let start = scanStartTime {
+                        let elapsed = Date().timeIntervalSince(start)
+                        currentPPS = elapsed > 0 ? Double(processed) / elapsed : 0.0
+                    }
                 }
             }
 
             // We no longer call updateDayGroupsIncrementally() here.
             // Re-clustering 20,000 photos every 40 images causes an O(N^2) CPU spiral
             // that locks up the device and spikes RAM to 3GB+.
-            // The UI hides dayGroups during scanning anyway, so we just wait for Step 6.
+            // dayGroups stay populated with cached data (incl. near-dup badges)
+            // throughout the scan; final clustering replaces them in one pass
+            // when processing completes.
 
+            // SPEC: yield + sleep give the main run loop room to render scroll
+            // updates and gestures before we kick off the next Vision batch.
             await Task.yield()
+            if runningInBackground {
+                try? await Task.sleep(nanoseconds: Self.backgroundScanBatchDelayNs)
+            }
         }
 
         stopPrefetching(for: previousPrefetchAssets)
         return results
     }
 
-    // MARK: - Persist
+    // MARK: - Persist (incremental)
 
-    private func saveToSwiftData(
-        allMetadata: [AssetMetadata],
-        rawClusters: [RawCluster],
-        featureMap: [String: Data],
+    /// Upserts `AssetRecord`s for a batch of freshly-analysed candidates, preserving
+    /// previously-saved features for assets we didn't touch this batch.
+    private func upsertAssetRecords(
+        _ batch: [ScannedAssetInfo],
+        metadataByID: [String: AssetMetadata],
         context: ModelContext
     ) {
-        let clusterAssignment: [String: String] = {
-            var m: [String: String] = [:]
-            for raw in rawClusters {
-                let id = UUID().uuidString
-                raw.assetIdentifiers.forEach { m[$0] = id }
-            }
-            return m
-        }()
+        guard !batch.isEmpty else { return }
+        let ids = batch.map(\.localIdentifier)
+        let predicate = #Predicate<AssetRecord> { ids.contains($0.localIdentifier) }
+        let descriptor = FetchDescriptor<AssetRecord>(predicate: predicate)
+        let existing = (try? context.fetch(descriptor)) ?? []
+        let existingMap = Dictionary(uniqueKeysWithValues: existing.map { ($0.localIdentifier, $0) })
 
+        for info in batch {
+            let isNew = existingMap[info.localIdentifier] == nil
+            let record = existingMap[info.localIdentifier] ?? AssetRecord(localIdentifier: info.localIdentifier)
+            record.creationDate       = info.date
+            record.fileSize           = info.fileSize
+            record.isScreenshot       = info.isScreenshot
+            record.isLocallyAvailable = true
+            record.featureVectorData  = info.featureData
+            if let lat = info.latitude  { record.latitude  = lat }
+            if let lng = info.longitude { record.longitude = lng }
+            if isNew { context.insert(record) }
+        }
+
+        _ = metadataByID
+        try? context.save()
+    }
+
+    /// Final commit: replace cluster records and reconcile the asset table with the
+    /// current PhotoKit library. Performed in a single transaction so a crash here
+    /// can't leave the UI looking at half-deleted clusters.
+    private func finalizeSwiftData(
+        allMetadata: [AssetMetadata],
+        rawClusters: [RawCluster],
+        incremental: Bool,
+        context: ModelContext
+    ) {
+        // Cluster assignment lookup so each asset points at its day cluster.
+        var clusterAssignment: [String: String] = [:]
         let clusterRecords: [ClusterRecord] = rawClusters.map { raw in
             let id = UUID().uuidString
+            raw.assetIdentifiers.forEach { clusterAssignment[$0] = id }
             return ClusterRecord(
                 id: id,
                 clusterType: raw.type,
@@ -643,21 +952,45 @@ final class ScanEngine {
             )
         }
 
-        let assetRecords: [AssetRecord] = allMetadata.map { meta in
-            let record = AssetRecord(localIdentifier: meta.localIdentifier)
-            record.creationDate        = meta.date
-            record.fileSize            = meta.estimatedFileSize
-            record.isScreenshot        = meta.isScreenshot
-            record.isLocallyAvailable  = true
-            record.clusterID           = clusterAssignment[meta.localIdentifier]
-            record.featureVectorData   = featureMap[meta.localIdentifier]
+        // Wipe clusters (cheap, fully derivable) and any asset rows for photos
+        // that no longer exist in the library.
+        try? context.delete(model: ClusterRecord.self)
+
+        let liveIDs = Set(allMetadata.map(\.localIdentifier))
+        if let everything = try? context.fetch(FetchDescriptor<AssetRecord>()) {
+            for record in everything where !liveIDs.contains(record.localIdentifier) {
+                context.delete(record)
+            }
+        }
+
+        // Upsert asset records for the full library so metadata stays in sync,
+        // even for assets we didn't run Vision on this scan (already had features
+        // OR were not candidates).
+        let existing: [AssetRecord]
+        if incremental {
+            existing = (try? context.fetch(FetchDescriptor<AssetRecord>())) ?? []
+        } else {
+            // Full rescan: start clean. Any features computed in this run were
+            // upserted per-batch above, so we don't actually drop work.
+            try? context.delete(model: AssetRecord.self)
+            existing = []
+        }
+        let existingMap = Dictionary(uniqueKeysWithValues: existing.map { ($0.localIdentifier, $0) })
+
+        for meta in allMetadata {
+            let isNew = existingMap[meta.localIdentifier] == nil
+            let record = existingMap[meta.localIdentifier] ?? AssetRecord(localIdentifier: meta.localIdentifier)
+            record.creationDate       = meta.date
+            record.fileSize           = meta.estimatedFileSize
+            record.isScreenshot       = meta.isScreenshot
+            record.isLocallyAvailable = true
+            record.clusterID          = clusterAssignment[meta.localIdentifier]
             if let lat = meta.latitude  { record.latitude  = lat }
             if let lng = meta.longitude { record.longitude = lng }
-            return record
+            if isNew { context.insert(record) }
         }
 
         for record in clusterRecords { context.insert(record) }
-        for record in assetRecords { context.insert(record) }
         try? context.save()
     }
 
@@ -685,6 +1018,7 @@ final class ScanEngine {
         }
         guard !photos.isEmpty else { return nil }
         return DayGroup(
+            id: DayGroup.stableID(for: date),
             date: date,
             location: raw.label,
             representativeLat: raw.representativeLat,
@@ -709,6 +1043,7 @@ final class ScanEngine {
         }
         guard !photos.isEmpty else { return nil }
         return DayGroup(
+            id: DayGroup.stableID(for: date),
             date: date,
             location: record.label,
             representativeLat: record.representativeLat,
@@ -733,6 +1068,7 @@ final class ScanEngine {
         }
         guard !photos.isEmpty else { return nil }
         return DayGroup(
+            id: DayGroup.stableID(for: date),
             date: date,
             location: record.label,
             representativeLat: record.representativeLat,

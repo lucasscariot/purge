@@ -269,7 +269,17 @@ final class PhotoStackView: UIView {
     required init?(coder: NSCoder) { fatalError() }
 
     func update(photos: [DummyPhoto]) {
-        guard photos.map(\.id) != self.photos.map(\.id) else { return }
+        // SPEC: only rebuild when the underlying photo identities actually
+        // change. Comparing by localIdentifier (with a UUID fallback for
+        // fixture/preview photos) means a rebuilt dayGroups array that
+        // wraps the same PHAsset set is treated as a no-op — no card
+        // teardown, no Vision/PhotoKit thumbnail re-fetch, no jank.
+        let visibleCount = min(photos.count, patternOffsets.map(\.count).max().map { $0 + 1 } ?? photos.count)
+        let oldVisible = min(self.photos.count, visibleCount)
+        let newVisible = min(photos.count, visibleCount)
+        let oldKeys = self.photos.prefix(oldVisible).map { $0.localIdentifier ?? $0.id.uuidString }
+        let newKeys = photos.prefix(newVisible).map { $0.localIdentifier ?? $0.id.uuidString }
+        guard oldKeys != newKeys else { return }
         print("[PinchablePhotoStack] Rebuilding stack because IDs changed")
         self.photos = photos
         cardViews.forEach { $0.removeFromSuperview() }
