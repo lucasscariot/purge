@@ -40,4 +40,10 @@ enum AnalyticsService {
             "favourited": favourited
         ])
     }
+
+    static func logPushNotificationOpened(identifier: String) {
+        Analytics.logEvent("push_notification_opened", parameters: [
+            "notification_id": identifier
+        ])
+    }
 }

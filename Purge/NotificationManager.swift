@@ -11,10 +11,15 @@ class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
     }
     
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
-        
+
         print("NotificationManager: Foreground notification received: \(notification.request.content.title)")
-        
+
         // Use .banner and .alert, .sound, .badge to ensure visibility
         completionHandler([.banner, .sound, .badge])
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        AnalyticsService.logPushNotificationOpened(identifier: response.notification.request.identifier)
+        completionHandler()
     }
 }
